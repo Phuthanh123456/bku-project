@@ -1,0 +1,35 @@
+# ENVI-NMT — môi trường đã ghim phiên bản (TASK 01)
+# Mọi máy cài ra phải cùng một môi trường, nếu không thì số đo không so sánh được.
+#
+# Trên Kaggle KHÔNG chạy file này (Kaggle đã có sẵn torch dựng cho CUDA của họ).
+# Trên Kaggle chỉ cần:
+#     pip install -q tokenizers==0.21.0 sacrebleu==2.4.3 huggingface_hub==0.27.1 PyYAML==6.0.2
+
+# --- Lõi ---
+torch==2.5.1
+numpy==2.2.1
+PyYAML==6.0.2
+
+# --- Dữ liệu & tokenizer ---
+tokenizers==0.21.0
+huggingface_hub==0.27.1
+
+# --- Đánh giá ---
+sacrebleu==2.4.3
+
+# --- Theo dõi huấn luyện ---
+tensorboard==2.18.0
+
+# --- Vẽ hình cho báo cáo ---
+matplotlib==3.10.0
+pandas==2.2.3
+
+# --- Kiểm thử ---
+pytest==8.3.4
+
+# --- Demo (Phase 5) ---
+streamlit==1.41.1
+
+# --- Mức mở rộng Phase 5, cài khi cần ---
+# onnx==1.17.0
+# onnxruntime==1.20.1

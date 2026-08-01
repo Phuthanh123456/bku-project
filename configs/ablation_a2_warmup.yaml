@@ -1,0 +1,11 @@
+# A2 — Warmup TẮT (base)  vs  Warmup BẬT (file này)   (TASK 18)
+# LƯU Ý TRƯỚC KHI CHẠY: Pre-Norm vốn đã làm giảm nhu cầu warmup
+# (On Layer Normalization in the Transformer Architecture, arxiv 2002.04745).
+# Nên chênh lệch rất nhỏ là KẾT QUẢ LÝ THUYẾT ĐÃ DỰ ĐOÁN, không phải bug,
+# cũng không phải ablation thất bại. Viết thẳng điều này vào báo cáo kèm trích dẫn.
+ke_thua: base.yaml
+thi_nghiem:
+  ten: a2_warmup_bat
+toi_uu:
+  scheduler: warmup
+  so_buoc_warmup: 4000

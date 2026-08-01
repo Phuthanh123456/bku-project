@@ -1,0 +1,7 @@
+# A4 — RoPE  vs  Positional Encoding sin-cos   (TASK 17)
+# sin-cos: cộng vector vị trí vào embedding, KHÔNG xoay query/key trong attention.
+ke_thua: base.yaml
+thi_nghiem:
+  ten: a4_sincos
+mo_hinh:
+  ma_hoa_vi_tri: sinusoidal

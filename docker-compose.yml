@@ -1,0 +1,20 @@
+# TASK 20 — Phú. Chạy demo bằng MỘT lệnh duy nhất: docker compose up
+
+services:
+  demo:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: envi-nmt:latest
+    container_name: envi-nmt-demo
+    ports:
+      - "8501:8501"
+    volumes:
+      # Checkpoint và tokenizer gắn từ ngoài vào, chỉ đọc.
+      # Nhờ vậy đổi mô hình chỉ cần thay file, không phải build lại image.
+      - ./artifacts:/app/artifacts:ro
+    environment:
+      - DUONG_DAN_CHECKPOINT=/app/artifacts/checkpoints/tot_nhat.pt
+      - DUONG_DAN_TOKENIZER=/app/artifacts/tokenizer/tokenizer.json
+      - DUONG_DAN_CONFIG=/app/configs/base.yaml
+    restart: unless-stopped

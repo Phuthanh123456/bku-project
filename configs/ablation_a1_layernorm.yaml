@@ -1,0 +1,9 @@
+# A1 — RMSNorm  vs  LayerNorm   (TASK 17)
+# Mentor hỏi trực tiếp: "Vì sao chọn RMSNorm thay LayerNorm? Nên thử cả hai."
+# Đây là thí nghiệm ƯU TIÊN CAO NHẤT, giữ lại kể cả khi phải thu gọn ablation.
+# Đối chứng: base.yaml (kieu_chuan_hoa = rmsnorm)
+ke_thua: base.yaml
+thi_nghiem:
+  ten: a1_layernorm
+mo_hinh:
+  kieu_chuan_hoa: layernorm

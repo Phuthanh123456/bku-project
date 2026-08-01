@@ -1,0 +1,65 @@
+# ===== BÍ MẬT — không bao giờ commit =====
+.env
+.env.*
+!.env.example
+*.token
+kaggle.json
+secrets.yaml
+
+# ===== Dữ liệu & artifact nặng =====
+data/*
+!data/.gitkeep
+!data/README.md
+artifacts/*
+!artifacts/.gitkeep
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.onnx
+*.safetensors
+
+# tokenizer.json là artifact do train sinh ra, không commit
+tokenizer.json
+vocab.json
+merges.txt
+
+# ===== Kết quả chạy =====
+results/*
+!results/.gitkeep
+runs/
+logs/
+tensorboard/
+wandb/
+*.csv
+!docs/**/*.csv
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.python-version
+
+# ===== Test & cache =====
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# ===== Notebook =====
+.ipynb_checkpoints/
+
+# ===== IDE / OS =====
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

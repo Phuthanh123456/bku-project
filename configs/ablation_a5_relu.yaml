@@ -1,0 +1,11 @@
+# A5 — SwiGLU (3 ma trận, d_ff=688)  vs  ReLU (2 ma trận, d_ff=1024)   (TASK 17)
+# d_ff phải đổi theo để hai phương án có số tham số tương đương (chênh dưới 1%):
+#   SwiGLU: 3 x 512 x 688  = 1.056.768
+#   ReLU:   2 x 512 x 1024 = 1.048.576
+# Nếu giữ nguyên d_ff thì đang so hai mô hình khác cỡ, ablation mất ý nghĩa.
+ke_thua: base.yaml
+thi_nghiem:
+  ten: a5_relu
+mo_hinh:
+  kieu_ffn: relu
+  d_ff: 1024

@@ -1,0 +1,90 @@
+# =============================================================================
+# ENVI-NMT — cấu hình gốc
+# Mọi file ablation đều kế thừa file này qua khóa `ke_thua:` và chỉ ghi đè
+# ĐÚNG MỘT yếu tố. Không bao giờ sửa trực tiếp file này để chạy ablation.
+# =============================================================================
+
+thi_nghiem:
+  ten: iwslt_base_v1
+  seed: 42                    # TASK 01 — cố định seed cho torch, numpy, random, DataLoader worker
+  deterministic: true         # bật cuDNN deterministic. Chậm hơn ~5-10% nhưng chạy lại là giống hệt
+  hub_repo: "<ten-tai-khoan-hf>/envi-nmt-scratch-transformer"
+  thu_muc_log: results/logs
+  thu_muc_checkpoint: artifacts/checkpoints
+
+du_lieu:
+  train: data/processed/train
+  dev:   data/processed/tst2012
+  test:  data/processed/tst2013
+  tokenizer: artifacts/tokenizer/tokenizer.json
+  vocab_size: 32000
+  do_dai_toi_da: 100
+  so_token_moi_batch: 4096    # chốt lại sau khi đo tốc độ ở TASK 11
+  gom_theo_do_dai: true
+  so_worker: 2
+
+mo_hinh:
+  d_model: 512
+  so_head: 8                  # TASK 11 khảo sát 4 vs 8 rồi chốt
+  so_lop_encoder: 6           # TASK 11 khảo sát 4 vs 6 rồi chốt
+  so_lop_decoder: 6
+  dropout: 0.3                # cao hơn mặc định 0.1 vì dữ liệu chỉ 133k câu
+  chia_se_embedding: true     # encoder + decoder + lớp xuất dùng chung một ma trận
+
+  # --- Bốn khối kiến trúc, MỖI KHỐI CÀI HAI PHƯƠNG ÁN ---
+  # Đổi giá trị ở đây là đổi kiến trúc, KHÔNG được sửa code.
+
+  ma_hoa_vi_tri: rope         # rope | sinusoidal          → ablation A4
+  rope_theta: 10000
+  rope_ap_cho_cross_attention: false   # BẮT BUỘC false. RoPE chỉ dành cho self-attention. Bài test 11.
+
+  vi_tri_chuan_hoa: pre       # pre | post                 → ablation A6
+  co_chuan_hoa_cuoi: true     # BẮT BUỘC true khi vi_tri_chuan_hoa = pre. Bài test 10.
+
+  kieu_chuan_hoa: rmsnorm     # rmsnorm | layernorm        → ablation A1
+  norm_eps: 1.0e-6
+
+  kieu_ffn: swiglu            # swiglu | relu              → ablation A5
+  d_ff: 688                   # 688 cho swiglu (3 ma trận) — 1024 cho relu (2 ma trận)
+                              # 1024 x 2/3 = 682.67 -> làm tròn 688 để chia hết cho 16
+                              # SwiGLU: 3*512*688 = 1.056.768 tham số
+                              # ReLU:   2*512*1024 = 1.048.576 tham số  → chênh 0,8%
+  khoi_tao: xavier
+
+toi_uu:
+  optimizer: adamw
+  learning_rate: 7.0e-4
+  betas: [0.9, 0.98]
+  eps: 1.0e-9
+  weight_decay: 0.01
+
+  # --- Hai kỹ thuật huấn luyện: MẶC ĐỊNH TẮT ---
+  # Theo nhận xét 1 của mentor: Warmup và Label Smoothing chưa chắc luôn tốt,
+  # không được xem là bắt buộc. Giữ hay bỏ do kết quả TASK 18 quyết định.
+  scheduler: co_dinh          # co_dinh | warmup           → ablation A2
+  so_buoc_warmup: 4000        # chỉ có tác dụng khi scheduler = warmup
+  label_smoothing: 0.0        # 0.0 | 0.1                  → ablation A3
+
+  so_buoc_cong_don_gradient: 4   # chốt lại sau khi đo tốc độ ở TASK 11
+  cat_gradient_norm: 1.0
+
+  # BẮT BUỘC fp16. GPU T4 là kiến trúc Turing (compute capability 7.5), KHÔNG có bf16.
+  # KHÔNG dùng torch.cuda.is_bf16_supported() để tự chọn — hàm này tính cả trường hợp
+  # giả lập phần mềm nên trả về True ngay trên T4, chạy được nhưng chậm hơn cả fp32.
+  # Muốn kiểm tự động thì dùng: torch.cuda.get_device_capability()[0] >= 8
+  do_chinh_xac_hon_hop: true
+  kieu_do_chinh_xac: fp16
+  grad_scaler_init: 65536.0
+
+huan_luyen:
+  so_buoc_toi_da: 60000       # chốt lại sau khi đo tốc độ ở TASK 11
+  danh_gia_moi: 1000
+  luu_checkpoint_moi: 2000
+  dung_som_sau: 5             # số lần đánh giá liên tiếp không cải thiện thì dừng
+
+sinh_cau:
+  cach: greedy                # greedy | beam   (beam là TASK 19, ưu tiên thấp)
+  beam_size: 4
+  he_so_phat_do_dai: 1.0
+  do_dai_toi_da_khi_dich: 128
+  dung_kv_cache: false        # TASK 19

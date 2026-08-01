@@ -1,0 +1,13 @@
+# A6 — Pre-Norm  vs  Post-Norm   (TASK 17)
+#   Pre-Norm : x + SubLayer(Norm(x))     — bản hiện đại
+#   Post-Norm: Norm(x + SubLayer(x))     — bản 2017
+# co_chuan_hoa_cuoi = false vì lớp chuẩn hóa cuối chỉ cần thiết cho Pre-Norm.
+# Cảnh báo: Post-Norm gần như bắt buộc phải có warmup, nếu không thì loss
+# phân kỳ ngay những bước đầu. Nếu A6 phân kỳ với scheduler = co_dinh thì
+# ĐÓ CHÍNH LÀ KẾT QUẢ, hãy ghi lại chứ đừng lặng lẽ bật warmup lên.
+ke_thua: base.yaml
+thi_nghiem:
+  ten: a6_post_norm
+mo_hinh:
+  vi_tri_chuan_hoa: post
+  co_chuan_hoa_cuoi: false

@@ -1,0 +1,32 @@
+# Thống nhất ký tự xuống dòng giữa Windows, Ubuntu và Kaggle.
+# Không có file này thì git sẽ báo "toàn bộ file bị đổi" mỗi lần người khác mở ra.
+* text=auto eol=lf
+
+# File văn bản — luôn LF trong repo
+*.py     text eol=lf
+*.md     text eol=lf
+*.yaml   text eol=lf
+*.yml    text eol=lf
+*.txt    text eol=lf
+*.json   text eol=lf
+*.cfg    text eol=lf
+*.toml   text eol=lf
+Dockerfile text eol=lf
+*.sh     text eol=lf
+
+# Script Windows — giữ CRLF
+*.bat    text eol=crlf
+*.ps1    text eol=crlf
+
+# Nhị phân — đừng đụng vào
+*.pt     binary
+*.pth    binary
+*.ckpt   binary
+*.onnx   binary
+*.png    binary
+*.jpg    binary
+*.pdf    binary
+*.mp4    binary
+
+# Notebook: giảm xung đột khi merge
+*.ipynb  text eol=lf

@@ -1,0 +1,7 @@
+# A3 — Label Smoothing 0.0 (base)  vs  0.1 (file này)   (TASK 18)
+# Kết quả quyết định giữ hay bỏ kỹ thuật này khỏi cấu hình cuối cùng.
+ke_thua: base.yaml
+thi_nghiem:
+  ten: a3_label_smoothing_01
+toi_uu:
+  label_smoothing: 0.1
