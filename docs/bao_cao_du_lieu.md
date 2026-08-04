@@ -1,16 +1,52 @@
-# Bao Cao Du Lieu
+# Báo cáo dữ liệu — TASK 02
 
-> **Phụ trách: TASK 02 + 03 + 04 — My**
->
-> File này còn trống. Điền vào trong lúc làm task, đừng để tới tuần 4 mới viết.
+**Người làm:** My  |  **Seed:** 42
 
-## Nội dung cần có
+## Nguồn
 
-- Nguồn tải và số dòng gốc của từng file (train, tst2012, tst2013)
-- Bảng thống kê quá trình lọc: tên bước | trước | bị loại | còn lại | % bị loại
-- Hai biểu đồ histogram phân bố độ dài câu (một cho tiếng Anh, một cho tiếng Việt)
-- Kết quả check rò rỉ: bao nhiêu câu test lọt vào train (mong muốn: 0)
-- Bảng thống kê tokenizer: 30 token hay gặp nhất, % token xuất hiện dưới 5 lần, % token lạ trên dev (yêu cầu < 0,5%)
-- Kết quả mã hóa - giải mã ngược trên toàn tập dev (yêu cầu > 99% khớp hoàn toàn)
-- Ảnh chụp một batch mẫu: kích thước ma trận, padding mask, causal mask dạng tam giác
-- Tỉ lệ ô đệm thừa trong batch (yêu cầu < 25%)
+IWSLT 2015 English–Vietnamese, mirror: `https://raw.githubusercontent.com/stefan-it/nmt-en-vi/master/data`
+
+| File tgz | URL |
+|---|---|
+| `train-en-vi.tgz` | https://raw.githubusercontent.com/stefan-it/nmt-en-vi/master/data/train-en-vi.tgz |
+| `dev-2012-en-vi.tgz` | https://raw.githubusercontent.com/stefan-it/nmt-en-vi/master/data/dev-2012-en-vi.tgz |
+| `test-2013-en-vi.tgz` | https://raw.githubusercontent.com/stefan-it/nmt-en-vi/master/data/test-2013-en-vi.tgz |
+
+## Cấu trúc thư mục sau khi chạy
+
+```
+data/
+├── raw/
+│   ├── train.en  train.vi
+│   ├── tst2012.en  tst2012.vi
+│   └── tst2013.en  tst2013.vi
+└── processed/
+    ├── train.en  train.vi
+    ├── tst2012.en  tst2012.vi
+    └── tst2013.en  tst2013.vi
+```
+
+## Thống kê lọc
+
+> Ngưỡng lọc: `do_dai_toi_da = 100` token (đọc từ `configs/base.yaml`)
+
+| Split | Trước lọc | Sau lọc | Bị loại | Rỗng | Trùng | Quá ngắn | Quá dài |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| train | 133,317 | 131,400 | 1,917 | 151 | 1006 | 0 | 760 |
+| tst2012 | 1,553 | 1,548 | 5 | 0 | 2 | 0 | 3 |
+| tst2013 | 1,268 | 1,255 | 13 | 0 | 7 | 0 | 6 |
+
+## Lưu ý tái lập
+
+Chạy lại từ đầu bằng:
+```bash
+python scripts/prepare_data.py --config configs/base.yaml
+```
+
+Sau khi chạy xong, kiểm tra bất biến quan trọng:
+```bash
+wc -l data/processed/train.en data/processed/train.vi
+wc -l data/processed/tst2012.en data/processed/tst2012.vi
+wc -l data/processed/tst2013.en data/processed/tst2013.vi
+```
+Số dòng EN và VI của mỗi split **phải bằng nhau** (script đã tự kiểm tra và báo lỗi nếu lệch).
