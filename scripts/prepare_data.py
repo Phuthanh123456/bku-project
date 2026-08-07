@@ -36,6 +36,7 @@ for _luong in (sys.stdout, sys.stderr):
         _luong.reconfigure(encoding="utf-8", errors="replace")
 
 from nmt.utils import dat_seed, luu_config, nap_config
+from nmt.data.cleaning import kiem_tra_ro_ri as _kiem_tra_ro_ri
 
 # ---------------------------------------------------------------------------
 # Logger chuẩn stdlib (BoGhiLog dành cho training metrics, không dùng ở đây)
@@ -84,6 +85,7 @@ NGUON_DU_LIEU = [
 # ---------------------------------------------------------------------------
 _DO_DAI_TOI_THIEU = 1   # tokens (từ/BPE units)  — luôn lọc câu rỗng
 # _DO_DAI_TOI_DA được lấy từ cfg.du_lieu.do_dai_toi_da
+_TI_LE_LECH_TOI_DA = 3.0  # chỉ áp cho train — lọc cặp câu lệch độ dài quá 3 lần
 
 
 # ---------------------------------------------------------------------------
@@ -182,6 +184,8 @@ class ThongKe(NamedTuple):
     bi_trung: int
     bi_qua_ngan: int
     bi_qua_dai: int
+    bi_lech_do_dai: int = 0   # chỉ > 0 với tập train
+    bi_ro_ri: int = 0         # số câu xóa khỏi train do rò rỉ từ dev/test
 
     @property
     def bi_loai(self) -> int:
@@ -192,17 +196,20 @@ class ThongKe(NamedTuple):
 # Hàm lõi: đọc → làm sạch → lọc → ghi
 # ---------------------------------------------------------------------------
 
-def _xu_ly_split(
+def _xu_ly_train(
     *,
     split: str,
     file_en_raw: Path,
     file_vi_raw: Path,
     thu_muc_processed: Path,
     do_dai_toi_da: int,
+    ti_le_lech_toi_da: float = _TI_LE_LECH_TOI_DA,
 ) -> ThongKe:
-    """Đọc cặp file raw, làm sạch + lọc, ghi ra processed."""
+    """Xử lý tập TRAIN: làm sạch + lọc đầy đủ (rỗng, trùng, quá ngắn, quá dài, lệch độ dài).
 
-    log.info(f"\n[{split}] Đang xử lý …")
+    KHÔNG dùng cho dev/test — dùng _xu_ly_dev_test() cho những tập đó.
+    """
+    log.info(f"\n[{split}] Đang xử lý (train — lọc đầy đủ) …")
 
     # --- Đọc ---
     dong_en = file_en_raw.read_text(encoding="utf-8").splitlines()
@@ -221,10 +228,11 @@ def _xu_ly_split(
     dong_vi = [_lam_sach_cau(c) for c in dong_vi]
 
     # --- Lọc ---
-    dem_rong     = 0
-    dem_trung    = 0
-    dem_qua_ngan = 0
-    dem_qua_dai  = 0
+    dem_rong        = 0
+    dem_trung       = 0
+    dem_qua_ngan    = 0
+    dem_qua_dai     = 0
+    dem_lech_do_dai = 0
 
     ket_qua_en: list[str] = []
     ket_qua_vi: list[str] = []
@@ -255,32 +263,27 @@ def _xu_ly_split(
             dem_qua_dai += 1
             continue
 
+        # 5. Lọc cặp lệch độ dài quá ti_le_lech_toi_da lần (dấu hiệu lệch dòng)
+        min_len = min(n_en, n_vi)
+        max_len = max(n_en, n_vi)
+        if min_len > 0 and max_len / min_len > ti_le_lech_toi_da:
+            dem_lech_do_dai += 1
+            continue
+
         ket_qua_en.append(en)
         ket_qua_vi.append(vi)
 
     sau_loc = len(ket_qua_en)
 
     # --- Ghi ra processed ---
-    thu_muc_processed.mkdir(parents=True, exist_ok=True)
-    (thu_muc_processed / f"{split}.en").write_text(
-        "\n".join(ket_qua_en) + "\n", encoding="utf-8"
+    _ghi_cap_file(
+        thu_muc_processed, split, ket_qua_en, ket_qua_vi
     )
-    (thu_muc_processed / f"{split}.vi").write_text(
-        "\n".join(ket_qua_vi) + "\n", encoding="utf-8"
-    )
-
-    # --- Kiểm tra bất biến: số dòng EN == VI ---
-    en_lines = len((thu_muc_processed / f"{split}.en").read_text(encoding="utf-8").splitlines())
-    vi_lines = len((thu_muc_processed / f"{split}.vi").read_text(encoding="utf-8").splitlines())
-    if en_lines != vi_lines:
-        raise RuntimeError(
-            f"[{split}] BUG: sau xử lý EN ({en_lines}) ≠ VI ({vi_lines}). Báo ngay cho nhóm!"
-        )
 
     log.info(
         f"[{split}] {truoc_loc:>7,} cap -> {sau_loc:>7,} cap  "
         f"(-rong:{dem_rong}  -trung:{dem_trung}  "
-        f"-ngan:{dem_qua_ngan}  -dai:{dem_qua_dai})"
+        f"-ngan:{dem_qua_ngan}  -dai:{dem_qua_dai}  -lech:{dem_lech_do_dai})"
     )
 
     return ThongKe(
@@ -291,7 +294,85 @@ def _xu_ly_split(
         bi_trung=dem_trung,
         bi_qua_ngan=dem_qua_ngan,
         bi_qua_dai=dem_qua_dai,
+        bi_lech_do_dai=dem_lech_do_dai,
     )
+
+
+def _xu_ly_dev_test(
+    *,
+    split: str,
+    file_en_raw: Path,
+    file_vi_raw: Path,
+    thu_muc_processed: Path,
+) -> ThongKe:
+    """Xử lý tập DEV / TEST: CHỈ chuẩn hóa NFC, KHÔNG lọc.
+
+    Tập dev/test phải giữ nguyên số câu để điểm BLEU so sánh được với
+    các bài báo IWSLT (tst2012: 1553 câu, tst2013: 1268 câu).
+    Bất kỳ bộ lọc nào cũng làm lệch kết quả đánh giá.
+    """
+    log.info(f"\n[{split}] Đang xử lý (dev/test — chỉ NFC, giữ nguyên số dòng) …")
+
+    # --- Đọc ---
+    dong_en = file_en_raw.read_text(encoding="utf-8").splitlines()
+    dong_vi = file_vi_raw.read_text(encoding="utf-8").splitlines()
+
+    if len(dong_en) != len(dong_vi):
+        raise RuntimeError(
+            f"[{split}] Số dòng EN ({len(dong_en)}) ≠ VI ({len(dong_vi)}) trong raw — "
+            "dữ liệu gốc đã bị lệch cặp!"
+        )
+
+    truoc_loc = len(dong_en)
+
+    # --- Chỉ chuẩn hóa NFC (+ strip, giải mã HTML entity, bỏ tag) ---
+    # Dùng _lam_sach_cau() để nhất quán với train, nhưng KHÔNG lọc câu nào.
+    dong_en = [_lam_sach_cau(c) for c in dong_en]
+    dong_vi = [_lam_sach_cau(c) for c in dong_vi]
+
+    sau_loc = len(dong_en)  # không đổi
+
+    # --- Ghi ra processed ---
+    _ghi_cap_file(thu_muc_processed, split, dong_en, dong_vi)
+
+    log.info(
+        f"[{split}] {truoc_loc:>7,} cap -> {sau_loc:>7,} cap  (không lọc — chỉ NFC)"
+    )
+
+    return ThongKe(
+        split=split,
+        truoc_loc=truoc_loc,
+        sau_loc=sau_loc,
+        bi_rong=0,
+        bi_trung=0,
+        bi_qua_ngan=0,
+        bi_qua_dai=0,
+        bi_lech_do_dai=0,
+    )
+
+
+def _ghi_cap_file(
+    thu_muc: Path,
+    split: str,
+    dong_en: list[str],
+    dong_vi: list[str],
+) -> None:
+    """Ghi cặp file .en và .vi ra thư mục processed, kiểm tra bất biến số dòng."""
+    thu_muc.mkdir(parents=True, exist_ok=True)
+    (thu_muc / f"{split}.en").write_text(
+        "\n".join(dong_en) + "\n", encoding="utf-8"
+    )
+    (thu_muc / f"{split}.vi").write_text(
+        "\n".join(dong_vi) + "\n", encoding="utf-8"
+    )
+
+    # Kiểm tra bất biến: số dòng EN == VI
+    en_lines = len((thu_muc / f"{split}.en").read_text(encoding="utf-8").splitlines())
+    vi_lines = len((thu_muc / f"{split}.vi").read_text(encoding="utf-8").splitlines())
+    if en_lines != vi_lines:
+        raise RuntimeError(
+            f"[{split}] BUG: sau xử lý EN ({en_lines}) ≠ VI ({vi_lines}). Báo ngay cho nhóm!"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -305,11 +386,13 @@ def _ghi_csv(danh_sach: list[ThongKe], duong_dan: Path) -> None:
         writer.writerow([
             "split", "truoc_loc", "sau_loc", "bi_loai",
             "bi_rong", "bi_trung", "bi_qua_ngan", "bi_qua_dai",
+            "bi_lech_do_dai", "bi_ro_ri",
         ])
         for tk in danh_sach:
             writer.writerow([
                 tk.split, tk.truoc_loc, tk.sau_loc, tk.bi_loai,
                 tk.bi_rong, tk.bi_trung, tk.bi_qua_ngan, tk.bi_qua_dai,
+                tk.bi_lech_do_dai, tk.bi_ro_ri,
             ])
 
 
@@ -318,6 +401,7 @@ def _ghi_bao_cao(
     duong_dan: Path,
     do_dai_toi_da: int,
     seed: int,
+    thong_tin_ro_ri: dict[str, int] | None = None,
 ) -> None:
     """Ghi docs/bao_cao_du_lieu.md để người khác tái lập được."""
     duong_dan.parent.mkdir(parents=True, exist_ok=True)
@@ -354,16 +438,58 @@ def _ghi_bao_cao(
         "",
         "## Thống kê lọc",
         "",
-        f"> Ngưỡng lọc: `do_dai_toi_da = {do_dai_toi_da}` token (đọc từ `configs/base.yaml`)",
+        f"> Ngưỡng lọc: `do_dai_toi_da = {do_dai_toi_da}` token, "
+        f"`ti_le_lech_toi_da = {_TI_LE_LECH_TOI_DA}` (đọc từ `configs/base.yaml`)  ",
+        f"> Tập dev/test **không bị lọc** — chỉ chuẩn hóa NFC để giữ nguyên số câu.",
         "",
-        "| Split | Trước lọc | Sau lọc | Bị loại | Rỗng | Trùng | Quá ngắn | Quá dài |",
-        "|---|--:|--:|--:|--:|--:|--:|--:|",
+        "| Split | Trước lọc | Sau lọc | Bị loại | Rỗng | Trùng | Quá ngắn | Quá dài | Lệch độ dài | Rò rỉ |",
+        "|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|",
     ]
     for tk in danh_sach:
         dong.append(
             f"| {tk.split} | {tk.truoc_loc:,} | {tk.sau_loc:,} | {tk.bi_loai:,} "
-            f"| {tk.bi_rong} | {tk.bi_trung} | {tk.bi_qua_ngan} | {tk.bi_qua_dai} |"
+            f"| {tk.bi_rong} | {tk.bi_trung} | {tk.bi_qua_ngan} | {tk.bi_qua_dai} "
+            f"| {tk.bi_lech_do_dai} | {tk.bi_ro_ri} |"
         )
+
+    # --- Mục kiểm tra rò rỉ ---
+    dong += [
+        "",
+        "## Kiểm tra rò rỉ test → train",
+        "",
+    ]
+    if thong_tin_ro_ri:
+        tong = sum(thong_tin_ro_ri.values())
+        for ten_split, so_cau in thong_tin_ro_ri.items():
+            dong.append(f"- **{ten_split}**: {so_cau} cặp câu trùng nguyên si → đã xóa khỏi train")
+        dong += [
+            "",
+            f"**Tổng số câu đã xóa khỏi train:** {tong} cặp",
+            "",
+            "> Câu bị xóa khỏi **train** (không xóa khỏi dev/test) để tránh rò rỉ làm đội điểm BLEU.",
+        ]
+    else:
+        dong += [
+            "Không phát hiện rò rỉ nào. Số câu test/dev trùng trong train: **0**.",
+        ]
+
+    # --- Xác nhận special tokens ---
+    dong += [
+        "",
+        "## Xác nhận special tokens",
+        "",
+        "| ID | Token | Ghi chú |",
+        "|---|---|---|",
+        "| 0 | `<pad>` | Padding |",
+        "| 1 | `<unk>` | Unknown |",
+        "| 2 | `<bos>` | Beginning of sequence (decoder input) |",
+        "| 3 | `<eos>` | End of sequence (decoder output / stop signal) |",
+        "| 4 | `<2en>` | Language token English (dành sẵn cho TASK 03) |",
+        "| 5 | `<2vi>` | Language token Vietnamese (dành sẵn cho TASK 03) |",
+        "",
+        "> Chốt dùng `<bos>` / `<eos>` (không dùng `<s>` / `</s>`).",
+        "> Quân biết khi làm TASK 09.",
+    ]
 
     dong += [
         "",
@@ -379,6 +505,7 @@ def _ghi_bao_cao(
         "wc -l data/processed/train.en data/processed/train.vi",
         "wc -l data/processed/tst2012.en data/processed/tst2012.vi",
         "wc -l data/processed/tst2013.en data/processed/tst2013.vi",
+        "# tst2013.en phải ra 1268, tst2012.en phải ra 1553",
         "```",
         "Số dòng EN và VI của mỗi split **phải bằng nhau** (script đã tự kiểm tra và báo lỗi nếu lệch).",
     ]
@@ -457,14 +584,85 @@ def main() -> None:
         file_en = thu_muc_raw / info["files"][0]   # *.en
         file_vi = thu_muc_raw / info["files"][1]   # *.vi
 
-        tk = _xu_ly_split(
-            split=split,
-            file_en_raw=file_en,
-            file_vi_raw=file_vi,
-            thu_muc_processed=thu_muc_processed,
-            do_dai_toi_da=do_dai_toi_da,
-        )
+        if split == "train":
+            # Tập train: lọc đầy đủ (rỗng, trùng, quá ngắn, quá dài, lệch độ dài)
+            tk = _xu_ly_train(
+                split=split,
+                file_en_raw=file_en,
+                file_vi_raw=file_vi,
+                thu_muc_processed=thu_muc_processed,
+                do_dai_toi_da=do_dai_toi_da,
+            )
+        else:
+            # Tập dev / test: CHỈ chuẩn hóa NFC, giữ nguyên số dòng
+            tk = _xu_ly_dev_test(
+                split=split,
+                file_en_raw=file_en,
+                file_vi_raw=file_vi,
+                thu_muc_processed=thu_muc_processed,
+            )
         tat_ca_thong_ke.append(tk)
+
+    # -----------------------------------------------------------------------
+    # BƯỚC 2b — Kiểm tra và loại bỏ rò rỉ test/dev → train
+    # -----------------------------------------------------------------------
+    log.info("\n[Bước 2b] Kiểm tra rò rỉ test/dev → train …")
+
+    # Đọc lại dữ liệu đã processed
+    def _doc_processed(split: str, lang: str) -> list[str]:
+        return (
+            thu_muc_processed / f"{split}.{lang}"
+        ).read_text(encoding="utf-8").splitlines()
+
+    train_en = _doc_processed("train", "en")
+    train_vi = _doc_processed("train", "vi")
+
+    thong_tin_ro_ri: dict[str, int] = {}
+    chi_so_can_xoa: set[int] = set()
+
+    for ten_split in ("tst2012", "tst2013"):
+        test_en = _doc_processed(ten_split, "en")
+        test_vi = _doc_processed(ten_split, "vi")
+
+        chi_so = _kiem_tra_ro_ri(train_en, train_vi, test_en, test_vi)
+        so_ro_ri = len(chi_so)
+        thong_tin_ro_ri[ten_split] = so_ro_ri
+        chi_so_can_xoa.update(chi_so)
+
+        if so_ro_ri > 0:
+            log.warning(
+                f"  ⚠ [{ten_split}] Phát hiện {so_ro_ri} cặp câu trùng trong train → sẽ xóa!"
+            )
+        else:
+            log.info(f"  ✔ [{ten_split}] Không phát hiện rò rỉ.")
+
+    if chi_so_can_xoa:
+        tong_ro_ri = len(chi_so_can_xoa)
+        log.warning(f"  ⚠ Tổng cộng xóa {tong_ro_ri} câu khỏi train (unique index).")
+
+        # Xóa các câu bị rò rỉ khỏi train (giữ nguyên dev/test)
+        train_en_sach = [s for i, s in enumerate(train_en) if i not in chi_so_can_xoa]
+        train_vi_sach = [s for i, s in enumerate(train_vi) if i not in chi_so_can_xoa]
+
+        # Ghi lại train đã sạch
+        _ghi_cap_file(thu_muc_processed, "train", train_en_sach, train_vi_sach)
+
+        # Cập nhật ThongKe cho train
+        tk_train = tat_ca_thong_ke[0]
+        tat_ca_thong_ke[0] = ThongKe(
+            split=tk_train.split,
+            truoc_loc=tk_train.truoc_loc,
+            sau_loc=tk_train.sau_loc - tong_ro_ri,
+            bi_rong=tk_train.bi_rong,
+            bi_trung=tk_train.bi_trung,
+            bi_qua_ngan=tk_train.bi_qua_ngan,
+            bi_qua_dai=tk_train.bi_qua_dai,
+            bi_lech_do_dai=tk_train.bi_lech_do_dai,
+            bi_ro_ri=tong_ro_ri,
+        )
+        log.info(f"  ✔ Đã ghi lại train sạch: {len(train_en_sach):,} câu.")
+    else:
+        log.info("  ✔ Không có rò rỉ. Train giữ nguyên.")
 
     # -----------------------------------------------------------------------
     # BƯỚC 3 — Ghi báo cáo
@@ -475,7 +673,10 @@ def main() -> None:
     bao_cao   = thu_muc_docs    / "bao_cao_du_lieu.md"
 
     _ghi_csv(tat_ca_thong_ke, csv_path)
-    _ghi_bao_cao(tat_ca_thong_ke, bao_cao, do_dai_toi_da, cfg.thi_nghiem.seed)
+    _ghi_bao_cao(
+        tat_ca_thong_ke, bao_cao, do_dai_toi_da,
+        cfg.thi_nghiem.seed, thong_tin_ro_ri,
+    )
 
     # Lưu lại config đã dùng (nguyên tắc tái lập)
     luu_config(cfg, thu_muc_results / "config_da_dung.yaml")
@@ -488,14 +689,18 @@ def main() -> None:
     # -----------------------------------------------------------------------
     log.info("\n" + "=" * 60)
     log.info("Tổng kết:")
-    log.info(f"  {'Split':<10} {'Trước':>10} {'Sau':>10} {'Bị loại':>10}")
-    log.info(f"  {'-'*10}  {'-'*10}  {'-'*10}  {'-'*10}")
+    log.info(f"  {'Split':<10} {'Trước':>10} {'Sau':>10} {'Bị loại':>10} {'Rò rỉ':>8}")
+    log.info(f"  {'-'*10}  {'-'*10}  {'-'*10}  {'-'*10}  {'-'*8}")
     for tk in tat_ca_thong_ke:
-        log.info(f"  {tk.split:<10} {tk.truoc_loc:>10,} {tk.sau_loc:>10,} {tk.bi_loai:>10,}")
+        log.info(
+            f"  {tk.split:<10} {tk.truoc_loc:>10,} {tk.sau_loc:>10,} "
+            f"{tk.bi_loai:>10,} {tk.bi_ro_ri:>8,}"
+        )
     log.info("=" * 60)
     log.info("✅ TASK 02 hoàn tất. Kiểm tra bất biến:")
     log.info("   wc -l data/processed/train.en data/processed/train.vi")
-    log.info("   (số dòng EN phải bằng VI cho mỗi split)")
+    log.info("   wc -l data/processed/tst2012.en  # phải ra 1553")
+    log.info("   wc -l data/processed/tst2013.en  # phải ra 1268")
 
 
 if __name__ == "__main__":

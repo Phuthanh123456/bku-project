@@ -45,17 +45,22 @@ logging.basicConfig(
 log = logging.getLogger("train_tokenizer")
 
 # ---------------------------------------------------------------------------
-# Token đặc biệt — thứ tự QUAN TRỌNG, phải nhất quán với TASK 04, 05, 11
+# Token đặc biệt — thứ tự QUAN TRỌNG, phải nhất quán với TASK 04, 05, 09, 11
 #   0: <pad>   — padding (attention_mask = 0 tại vị trí này)
 #   1: <unk>   — unknown (không nên xuất hiện sau khi train BPE đủ lớn)
 #   2: <bos>   — beginning of sequence (decoder input)
 #   3: <eos>   — end of sequence (decoder output, dùng để dừng sinh câu)
+#   4: <2en>   — language token English (dành sẵn cho multilingual, TASK 03 yêu cầu)
+#   5: <2vi>   — language token Vietnamese
+# Chốt dùng <bos>/<eos>, không dùng <s>/</s> — Quân biết khi làm TASK 09.
 # ---------------------------------------------------------------------------
-SPECIAL_TOKENS = ["<pad>", "<unk>", "<bos>", "<eos>"]
+SPECIAL_TOKENS = ["<pad>", "<unk>", "<bos>", "<eos>", "<2en>", "<2vi>"]
 PAD_ID = 0
 UNK_ID = 1
 BOS_ID = 2
 EOS_ID = 3
+L2EN_ID = 4   # language token English
+L2VI_ID = 5   # language token Vietnamese
 
 
 # ---------------------------------------------------------------------------
@@ -114,7 +119,7 @@ def _lay_30_token_pho_bien(tokenizer, cac_cau: list[str]) -> list[tuple[str, int
     for cau in cac_cau:
         ids = tokenizer.encode(cau).ids
         for id_ in ids:
-            if id_ not in (PAD_ID, UNK_ID, BOS_ID, EOS_ID):
+            if id_ not in (PAD_ID, UNK_ID, BOS_ID, EOS_ID, L2EN_ID, L2VI_ID):
                 dem[tokenizer.id_to_token(id_)] += 1
     return dem.most_common(30)
 
@@ -232,7 +237,7 @@ def main() -> None:
     log.info("  Train xong!")
 
     # Kiểm tra id của special tokens đúng thứ tự đã khai báo
-    for ten, id_mong_muon in zip(SPECIAL_TOKENS, [PAD_ID, UNK_ID, BOS_ID, EOS_ID]):
+    for ten, id_mong_muon in zip(SPECIAL_TOKENS, [PAD_ID, UNK_ID, BOS_ID, EOS_ID, L2EN_ID, L2VI_ID]):
         id_thuc_te = tokenizer.token_to_id(ten)
         if id_thuc_te != id_mong_muon:
             raise RuntimeError(

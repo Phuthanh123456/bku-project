@@ -64,3 +64,6 @@ htmlcov/
 Thumbs.db
 desktop.ini
 .agents/
+
+# ===== Agent scratch (Antigravity / Gemini IDE) =====
+.gemini/

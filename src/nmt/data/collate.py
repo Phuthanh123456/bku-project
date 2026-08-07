@@ -103,7 +103,9 @@ class GomBatchTheoTokenSampler(Sampler):
         return cac_batch
 
     def __iter__(self):
-        yield from self._batches
+        # Cuối mỗi epoch xây lại danh sách batch (có xáo trộn thứ tự nếu self._tron=True)
+        # để mô hình không thấy cùng một thứ tự batch ở mọi epoch.
+        yield from self._xay_cac_batch()
 
     def __len__(self) -> int:
         return len(self._batches)
