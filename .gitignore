@@ -60,6 +60,7 @@ htmlcov/
 # ===== IDE / OS =====
 .vscode/
 .idea/
+tempCodeRunnerFile.py
 .DS_Store
 Thumbs.db
 desktop.ini
