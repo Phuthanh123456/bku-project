@@ -91,17 +91,17 @@ Mỗi thí nghiệm ablation chạy **tối thiểu 2 seed** và báo cáo cả 
 | 02 | Tải & làm sạch dữ liệu IWSLT | **My** | A — Dữ liệu | 1 | Must |
 | 03 | Huấn luyện BPE Tokenizer 32k | **My** | A | 1 | Must |
 | 04 | Viết Dataset, DataLoader & Mask | **My** | A | 1 | Must |
-| 05 | Viết Attention & Multi-Head Attention | **Bảo** | B — Mô hình | 2 | Must |
-| 06 | Viết mã hóa vị trí (RoPE + sin-cos) | **Bảo** | B | 2 | Must |
-| 07 | Viết chuẩn hóa (RMSNorm + LayerNorm) | **Quân** | B | 2 | Must |
-| 08 | Viết Feed-Forward (SwiGLU + ReLU) | **Quân** | B | 2 | Must |
-| 09 | Ghép Encoder–Decoder thành mô hình | **Bảo** | B | 2 | Must |
+| 05 | Viết Attention & Multi-Head Attention | **Quân** | B — Mô hình | 2 | Must |
+| 06 | Viết mã hóa vị trí (RoPE + sin-cos) | **Quân** | B | 2 | Must |
+| 07 | Viết chuẩn hóa (RMSNorm + LayerNorm) | **Bảo** | B | 2 | Must |
+| 08 | Viết Feed-Forward (SwiGLU + ReLU) | **Bảo** | B | 2 | Must |
+| 09 | Ghép Encoder–Decoder thành mô hình | **Quân** | B | 2 | Must |
 | 10 | Kiểm chứng tính đúng đắn kiến trúc | **My** | A | 2 | Must |
-| 11 | Khảo sát cấu hình & ngân sách GPU | **Bảo** | C — Huấn luyện | 3 | Cao |
-| 12 | Cơ chế Checkpoint & đồng bộ HF Hub | **Quân** | C | 3 | Must |
-| 13 | Viết Training Loop | **Bảo** | C | 3 | Must |
-| 14 | Thí nghiệm giết phiên & phục hồi | **Quân** | C | 3 | Must |
-| 15 | Huấn luyện chính thức trên IWSLT | **Quân** | C | 3 | Must |
+| 11 | Khảo sát cấu hình & ngân sách GPU | **Quân** | C — Huấn luyện | 3 | Cao |
+| 12 | Cơ chế Checkpoint & đồng bộ HF Hub | **Bảo** | C | 3 | Must |
+| 13 | Viết Training Loop | **Quân** | C | 3 | Must |
+| 14 | Thí nghiệm giết phiên & phục hồi | **Bảo** | C | 3 | Must |
+| 15 | Huấn luyện chính thức trên IWSLT | **Bảo** | C | 3 | Must |
 | 16 | Greedy Search & chấm điểm baseline | **My** | D — Đánh giá | 4 | Must |
 | 17 | Ablation nhóm kiến trúc (A1 A4 A5 A6) | **Phú** | E — Ablation & Đóng gói | 4 | Cao |
 | 18 | Ablation nhóm kỹ thuật huấn luyện (A2 A3) | **Phú** | E | 4 | Cao |

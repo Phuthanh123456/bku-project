@@ -1,4 +1,4 @@
-"""TASK 01 + TASK 12 — Đồng bộ Hugging Face Hub.  Người làm: Quân.  [Training Infra • Bắt buộc]
+"""TASK 01 + TASK 12 — Đồng bộ Hugging Face Hub.  Người làm: Bảo.  [Training Infra • Bắt buộc]
 
 Nhóm dùng bản free trên Kaggle, đôi khi rớt mạng rồi F5 lại là mất sạch
 checkpoint, nên phải đẩy checkpoint qua Hugging Face.
@@ -42,9 +42,9 @@ def doc_token() -> str:
 
 def day_len_hub(duong_dan_file, repo_id: str, ten_tren_hub: str, so_lan_thu: int = 3) -> None:
     """Đẩy file lên Hub, có cơ chế thử lại khi mạng lỗi."""
-    raise NotImplementedError("TASK 12 — Quân")
+    raise NotImplementedError("TASK 12 — Bảo")
 
 
 def tai_checkpoint_moi_nhat(repo_id: str, thu_muc_luu):
     """Trả về đường dẫn checkpoint mới nhất, hoặc None nếu Hub chưa có gì."""
-    raise NotImplementedError("TASK 12 — Quân")
+    raise NotImplementedError("TASK 12 — Bảo")

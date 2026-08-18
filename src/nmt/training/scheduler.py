@@ -1,4 +1,4 @@
-"""TASK 13 — Learning rate scheduler.  Người làm: Bảo.  [Training • Bắt buộc]
+"""TASK 13 — Learning rate scheduler.  Người làm: Quân.  [Training • Bắt buộc]
 
 Theo nhận xét 1 của mentor: Warmup KHÔNG còn là thành phần bắt buộc.
 Mặc định trong base.yaml là `scheduler: co_dinh`. Ablation A2 (TASK 18) quyết
@@ -20,23 +20,23 @@ class WarmupScheduler:
     """
 
     def __init__(self, optimizer, d_model: int, so_buoc_warmup: int = 4000) -> None:
-        raise NotImplementedError("TASK 13 — Bảo")
+        raise NotImplementedError("TASK 13 — Quân")
 
     def step(self) -> None:
-        raise NotImplementedError("TASK 13 — Bảo")
+        raise NotImplementedError("TASK 13 — Quân")
 
     def state_dict(self) -> dict:
-        raise NotImplementedError("TASK 13 — Bảo")
+        raise NotImplementedError("TASK 13 — Quân")
 
     def load_state_dict(self, state: dict) -> None:
-        raise NotImplementedError("TASK 13 — Bảo")
+        raise NotImplementedError("TASK 13 — Quân")
 
 
 class SchedulerCoDinh:
     """Learning rate giữ nguyên — mặc định, và là nhánh đối chứng của A2."""
 
     def __init__(self, optimizer, learning_rate: float) -> None:
-        raise NotImplementedError("TASK 13 — Bảo")
+        raise NotImplementedError("TASK 13 — Quân")
 
     def step(self) -> None:
         pass

@@ -33,8 +33,8 @@ Mỗi Chain một nhánh. **Không ai push thẳng vào `main`.**
 |---|---|---|---|
 | 0 — Khởi động | Phú | `main` | 01 |
 | A — Dữ liệu | My | `feat/data` | 02, 03, 04, 10, 16 |
-| B — Mô hình | Bảo, Quân | `feat/model` | 05–09 |
-| C — Huấn luyện | Bảo, Quân | `feat/training` | 11–15 |
+| B — Mô hình | Quân (05, 06, 09), Bảo (07, 08) | `feat/model` | 05–09 |
+| C — Huấn luyện | Quân (11, 13), Bảo (12, 14, 15) | `feat/training` | 11–15 |
 | D — Đánh giá | My | `eval-baseline` | 16 |
 | E — Ablation & Đóng gói | Phú | `feat/ablation`, `feat/deploy` | 17–21 |
 
@@ -59,20 +59,20 @@ TASK 01 (Phú, main)
    |
    +--> Chain A: My  02 -> 03 -> 04 ------> push feat/data
    |
-   +--> Chain B: Bảo 05, 06 | Quân 07, 08   (bốn task ĐỘC LẬP, làm thứ tự nào cũng được)
-   |         xong cả bốn -> Bảo làm 09 -> push feat/model, gắn tag model-ready
+   +--> Chain B: Quân 05, 06 | Bảo 07, 08   (bốn task ĐỘC LẬP, làm thứ tự nào cũng được)
+   |         xong cả bốn -> Quân làm 09 -> push feat/model, gắn tag model-ready
    |
    +--> Chain E: Phú có thể bắt đầu TASK 20 sớm ngay sau TASK 09
 
    ĐIỂM HỢP LƯU 1 — TASK 10 (My):
-       pull feat/model của Bảo + gộp với feat/data của chính mình
+       pull feat/model của Quân + gộp với feat/data của chính mình
        chạy 12 bài test + học thuộc 50 câu
        ĐẠT -> push nhánh verified-model     <- CỔNG CHẶN cuối Tuần 2
 
-   Chain C: Bảo 11 (pull verified-model) | Quân 12 (làm song song, không phụ thuộc)
-            -> 13 (cần 09 + 12) -> 14 (cần 12 + 13) -> 15
+   Chain C: Quân 11 (pull verified-model) | Bảo 12 (làm song song, không phụ thuộc)
+            -> 13 Quân (cần 09 + 12) -> 14 Bảo (cần 12 + 13) -> 15 Bảo
 
-   ĐIỂM HỢP LƯU 2 — TASK 15 (Quân):
+   ĐIỂM HỢP LƯU 2 — TASK 15 (Bảo):
        đẩy checkpoint tốt nhất lên HUGGING FACE HUB (không phải git)
        My pull checkpoint đó về làm TASK 16
 

@@ -1,4 +1,4 @@
-"""TASK 12 — Cơ chế lưu checkpoint.  Người làm: Quân.  [Training Infra • Bắt buộc]
+"""TASK 12 — Cơ chế lưu checkpoint.  Người làm: Bảo.  [Training Infra • Bắt buộc]
 
 Xong khi: thời gian đồng bộ checkpoint chiếm dưới 5 phần trăm tổng thời gian huấn luyện.
 
@@ -22,9 +22,9 @@ from pathlib import Path
 
 
 def luu_checkpoint(duong_dan: str | Path, model, optimizer, scheduler, scaler, buoc: int, epoch: int, cfg) -> None:
-    raise NotImplementedError("TASK 12 — Quân")
+    raise NotImplementedError("TASK 12 — Bảo")
 
 
 def nap_checkpoint(duong_dan: str | Path, model, optimizer=None, scheduler=None, scaler=None) -> dict:
     """Returns: dict có ít nhất các khóa buoc và epoch để chạy tiếp đúng chỗ cũ."""
-    raise NotImplementedError("TASK 12 — Quân")
+    raise NotImplementedError("TASK 12 — Bảo")

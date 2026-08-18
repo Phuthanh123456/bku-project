@@ -1,4 +1,4 @@
-"""TASK 13 — Training Loop.  Người làm: Bảo.  [Training • Bắt buộc]
+"""TASK 13 — Training Loop.  Người làm: Quân.  [Training • Bắt buộc]
 
 Xong khi: huấn luyện liên tục 1000 bước không xuất hiện NaN.
 
@@ -31,11 +31,11 @@ from __future__ import annotations
 
 class Trainer:
     def __init__(self, cfg, model, train_loader, dev_loader, logger) -> None:
-        raise NotImplementedError("TASK 13 — Bảo")
+        raise NotImplementedError("TASK 13 — Quân")
 
     def train(self) -> None:
-        raise NotImplementedError("TASK 13 — Bảo")
+        raise NotImplementedError("TASK 13 — Quân")
 
     def danh_gia(self) -> dict:
         """Loss trên tập dev. Trả về dict để ghi log."""
-        raise NotImplementedError("TASK 13 — Bảo")
+        raise NotImplementedError("TASK 13 — Quân")
