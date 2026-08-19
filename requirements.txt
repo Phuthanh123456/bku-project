@@ -6,7 +6,7 @@
 #     pip install -q tokenizers==0.21.0 sacrebleu==2.4.3 huggingface_hub==0.27.1 PyYAML==6.0.2
 
 # --- Lõi ---
-torch==2.5.1
+torch==2.13.0
 numpy==2.2.1
 PyYAML==6.0.2
 
