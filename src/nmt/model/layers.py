@@ -35,6 +35,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from nmt.model.attention import MultiHeadAttention
+from nmt.model.normalization import ResidualConnection
+
 
 class SwiGLU(nn.Module):
     """SwiGLU(x) = (SiLU(x @ W_gate) * (x @ W_up)) @ W_down
@@ -230,6 +233,22 @@ def compare_ffn_parameters(
 # ===========================================================================
 
 
+def _build_residual(model_cfg) -> ResidualConnection:
+    """Dựng một ResidualConnection từ cfg.mo_hinh.
+
+    Gom lại một chỗ vì mỗi lớp encoder cần hai cái và mỗi lớp decoder cần ba,
+    tất cả đều dùng chung bộ tham số này. Vẫn tạo mới mỗi lần gọi, KHÔNG dùng
+    lại đối tượng cũ — xem bẫy số 2 ở khối chú thích phía trên.
+    """
+    return ResidualConnection(
+        d_model=model_cfg.d_model,
+        norm_type=model_cfg.kieu_chuan_hoa,
+        norm_position=model_cfg.vi_tri_chuan_hoa,
+        dropout=model_cfg.dropout,
+        eps=model_cfg.norm_eps,
+    )
+
+
 class EncoderLayer(nn.Module):
     """Một lớp encoder: self-attention (có RoPE) rồi tới feed forward.
 
@@ -243,10 +262,28 @@ class EncoderLayer(nn.Module):
 
     def __init__(self, cfg) -> None:
         super().__init__()
-        raise NotImplementedError("TASK 09 — Bảo. Xem khung gợi ý ở khối chú thích phía trên.")
+        model_cfg = cfg.mo_hinh
+
+        self.self_attn = MultiHeadAttention(
+            model_cfg.d_model, model_cfg.so_head, model_cfg.dropout
+        )
+        self.ffn = build_ffn(
+            model_cfg.kieu_ffn, model_cfg.d_model, model_cfg.d_ff, model_cfg.dropout
+        )
+
+        # BẪY SỐ 2: mỗi khối con MỘT ResidualConnection riêng. Dùng chung một cái
+        # là hai khối xài chung trọng số chuẩn hóa, chương trình vẫn chạy nhưng
+        # kiến trúc đã sai mà không có gì báo lỗi.
+        self.attn_residual = _build_residual(model_cfg)
+        self.ffn_residual = _build_residual(model_cfg)
 
     def forward(self, x, mask=None, rope=None):
-        raise NotImplementedError("TASK 09 — Bảo. Xem khung gợi ý ở khối chú thích phía trên.")
+        """x: (batch, seq_len, d_model) tới cùng kích thước."""
+        # BẪY SỐ 1: self_attn trả về CẶP (đầu ra, trọng số) nên phải lấy [0],
+        # vì ResidualConnection chỉ nhận hàm trả về đúng một tensor.
+        x = self.attn_residual(x, lambda h: self.self_attn(h, h, h, mask, rope)[0])
+        x = self.ffn_residual(x, self.ffn)
+        return x
 
 
 class DecoderLayer(nn.Module):
@@ -263,7 +300,37 @@ class DecoderLayer(nn.Module):
 
     def __init__(self, cfg) -> None:
         super().__init__()
-        raise NotImplementedError("TASK 09 — Bảo. Xem khung gợi ý ở khối chú thích phía trên.")
+        model_cfg = cfg.mo_hinh
+
+        self.self_attn = MultiHeadAttention(
+            model_cfg.d_model, model_cfg.so_head, model_cfg.dropout
+        )
+        self.cross_attn = MultiHeadAttention(
+            model_cfg.d_model, model_cfg.so_head, model_cfg.dropout
+        )
+        self.ffn = build_ffn(
+            model_cfg.kieu_ffn, model_cfg.d_model, model_cfg.d_ff, model_cfg.dropout
+        )
+
+        # Ba khối con nên cần BA ResidualConnection riêng.
+        self.self_attn_residual = _build_residual(model_cfg)
+        self.cross_attn_residual = _build_residual(model_cfg)
+        self.ffn_residual = _build_residual(model_cfg)
 
     def forward(self, x, encoder_memory, self_mask, cross_mask=None, rope=None):
-        raise NotImplementedError("TASK 09 — Bảo. Xem khung gợi ý ở khối chú thích phía trên.")
+        """x: (batch, len_tgt, d_model) tới cùng kích thước."""
+        # 1. masked self-attention — CÓ áp RoPE
+        x = self.self_attn_residual(x, lambda h: self.self_attn(h, h, h, self_mask, rope)[0])
+
+        # 2. cross-attention — query lấy từ x, key và value lấy từ encoder_memory.
+        #    rope=None là CÓ CHỦ ĐÍCH chứ không phải quên: query nằm ở câu tiếng
+        #    Việt còn key nằm ở câu tiếng Anh, khoảng cách giữa chúng vô nghĩa.
+        #    Xem bài kiểm tra số 11.
+        x = self.cross_attn_residual(
+            x,
+            lambda h: self.cross_attn(h, encoder_memory, encoder_memory, cross_mask, None)[0],
+        )
+
+        # 3. feed forward
+        x = self.ffn_residual(x, self.ffn)
+        return x
