@@ -173,9 +173,23 @@ def main() -> None:
 
     da_chay, bo_qua, hong = 0, 0, []
     for ma, duong_dan_cfg, seed in ke_hoach:
-        ten_goc = Path(duong_dan_cfg).stem.replace("ablation_", "")
-        ten_chay = (f"iwslt_base_v1_seed{seed}" if ma == "doi_chung"
-                    else f"{ten_goc}_seed{seed}")
+        # TÊN LƯỢT CHẠY PHẢI TÁCH HẲN KHỎI LƯỢT HUẤN LUYỆN CHÍNH.
+        #
+        # Bản đầu đặt đối chứng là "iwslt_base_v1_seed42" — trùng đúng tên lượt
+        # huấn luyện chính đang nằm trên Hub. Cộng với --tiep-tuc thì hậu quả là:
+        #   1. Đối chứng KÉO VỀ checkpoint 11.000 bước rồi chạy tiếp, thay vì
+        #      train 3.000 bước mới. Nó thành 14.000 bước còn A1..A6 chỉ có
+        #      3.000 — ngân sách lệch nhau nên ablation mất sạch ý nghĩa.
+        #   2. Nó GHI ĐÈ checkpoints/iwslt_base_v1_seed42/ trên Hub, phá luôn
+        #      model bước 6.000 đã giao.
+        # Cả hai đều không ném lỗi nào. Đúng loại hỏng im lặng đắt nhất.
+        #
+        # Nhét NGÂN SÁCH BƯỚC vào tên là lớp chặn thứ hai: đổi ngân sách thì tên
+        # đổi theo, nên kết quả của hai ngân sách khác nhau không thể lẫn vào
+        # cùng một bảng.
+        ten_goc = ("base" if ma == "doi_chung"
+                   else Path(duong_dan_cfg).stem.replace("ablation_", ""))
+        ten_chay = f"abl{so_buoc}_{ten_goc}_seed{seed}"
         if args.smoke:
             ten_chay = "smoke_" + ten_chay
 
@@ -192,8 +206,19 @@ def main() -> None:
                 break
 
         moc = time.perf_counter()
+        # --ten-thi-nghiem là thứ THẬT SỰ đổi tên lượt chạy. train.py đặt tên từ
+        # cfg.thi_nghiem.ten, nên thiếu cờ này thì đối chứng vẫn mang tên
+        # iwslt_base_v1_seed42 và đè lên lượt huấn luyện chính.
+        #
+        # --danh-gia-moi: lượt ablation ngắn hơn lượt chính nhiều lần, mà mặc định
+        # 1000 bước mới đánh giá một lần. Để nguyên thì lượt 3.000 bước chỉ đánh
+        # giá 3 lần, còn smoke 60 bước không đánh giá lần nào — không sinh ra
+        # tot_nhat.pt, nên không có loss_dev, không chấm được BLEU, và bảng kết
+        # quả toàn NaN. Chia làm 6 mốc để còn thấy được đường loss.
         lenh = [sys.executable, "scripts/train.py", "--config", duong_dan_cfg,
-                "--seed", str(seed), "--so-buoc", str(so_buoc), "--tiep-tuc"]
+                "--seed", str(seed), "--so-buoc", str(so_buoc), "--tiep-tuc",
+                "--ten-thi-nghiem", f"abl{so_buoc}_{ten_goc}",
+                "--danh-gia-moi", str(max(10, so_buoc // 6))]
         if args.smoke:
             lenh.append("--smoke")
         if args.repo_hub:
