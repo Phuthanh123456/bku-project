@@ -87,4 +87,8 @@ sinh_cau:
   beam_size: 4
   he_so_phat_do_dai: 1.0
   do_dai_toi_da_khi_dich: 128
-  dung_kv_cache: false        # TASK 19
+  # BẬT. Đo thật trên checkpoint bước 6.000, 40 câu tst2013: cache cho ra ĐÚNG
+  # cùng một chuỗi token mà nhanh gấp 5,5 lần (20,3 giây xuống 3,7 giây). Bài
+  # test tests/test_beam_search.py canh chuyện "cùng kết quả" cho cả rope lẫn
+  # sin-cos, nên bật lên không phải đánh đổi gì.
+  dung_kv_cache: true         # TASK 19

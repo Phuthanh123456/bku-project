@@ -14,7 +14,42 @@ import sys
 from pathlib import Path
 
 GOC = Path(__file__).resolve().parents[1]
-DUONG_DAN = GOC / "notebooks" / "03_kaggle_ablation.ipynb"
+
+# HAI NOTEBOOK, HAI PHIÊN KAGGLE.
+# 14 lượt x 3.000 bước là ~17 giờ, vượt mức cắt 12 giờ của một phiên. Chia theo
+# MỨC QUAN TRỌNG chứ không chia đôi cho đều: hết quota giữa chừng thì thứ mất đi
+# phải là thứ ít đau nhất, không phải thứ thầy hỏi.
+NHOM = {
+    "chinh": {
+        "file": "03_kaggle_ablation_chinh.ipynb",
+        "so_luot": 6,
+        "gio": "~7 giờ",
+        "tieu_de": "NHÓM CHÍNH — đối chứng · A0 vanilla 2017 · A1 LayerNorm",
+        "mo_ta": (
+            "| Thí nghiệm | Vì sao nằm ở nhóm chính |\n"
+            "|---|---|\n"
+            "| **đối chứng** | mốc so của MỌI thí nghiệm khác. Thiếu nó thì mọi bảng vô nghĩa |\n"
+            "| **A0 vanilla 2017** | thầy đề nghị trực tiếp. Đây là thí nghiệm biến đồ án "
+            "từ *\"code lại Transformer\"* thành một thực nghiệm đo được |\n"
+            "| **A1 RMSNorm vs LayerNorm** | mentor hỏi thẳng. File cấu hình ghi rõ "
+            "*\"ƯU TIÊN CAO NHẤT, giữ lại kể cả khi phải thu gọn ablation\"* |\n"
+        ),
+    },
+    "phu": {
+        "file": "04_kaggle_ablation_phu.ipynb",
+        "so_luot": 8,
+        "gio": "~9,5 giờ",
+        "tieu_de": "NHÓM PHỤ — A4 sin-cos · A5 ReLU · A6 Post-Norm · A2 warmup · A3 label smoothing",
+        "mo_ta": (
+            "> **Chạy notebook này SAU khi notebook 03 (nhóm chính) đã xong.**\n"
+            "> Nó tự kéo `ablation/ket_qua.csv` từ Hugging Face về, nên thấy được kết quả\n"
+            "> đối chứng của phiên trước mà so sánh. Không có hàng đối chứng thì bảng của\n"
+            "> nhóm phụ không có mốc để đối chiếu.\n\n"
+            "Năm thí nghiệm còn lại của TASK 17 và TASK 18. Vẫn cần cho báo cáo đầy đủ,\n"
+            "nhưng không ai hỏi trực tiếp, nên thiếu thì báo cáo vẫn đứng được.\n"
+        ),
+    },
+}
 
 for _luong in (sys.stdout, sys.stderr):
     if hasattr(_luong, "reconfigure"):
@@ -33,37 +68,40 @@ def code(noi_dung: str) -> dict:
 
 CAC_CELL = [
     md(r"""
-# ENVI-NMT — Toàn bộ ablation trên một notebook Kaggle T4
+# ENVI-NMT — Ablation · __TIEU_DE__
 
 **TASK 17 + TASK 18 + A0 (thí nghiệm thầy đề nghị).**
+
+__MO_TA__
 
 ## Chạy Run All HAI LẦN
 
 | Lượt | Đặt gì ở Cell 2 | Mất bao lâu | Để làm gì |
 |---|---|---|---|
-| **1** | `SMOKE_TEST = True` | ~10 phút | Chứng minh cả 14 lượt chạy trót lọt. Ghi vào nhánh `smoke/` trên Hub, **không đụng** kết quả thật |
-| **2** | `SMOKE_TEST = False` | ~9 giờ mỗi phiên, cần 2 phiên | Chạy thật |
+| **1** | `SMOKE_TEST = True` | ~5 phút | Chứng minh __SO_LUOT__ lượt chạy trót lọt. Ghi vào nhánh `smoke/` trên Hub, **không đụng** kết quả thật |
+| **2** | `SMOKE_TEST = False` | __GIO__ | Chạy thật |
 
 Lượt 1 mà đỏ ở đâu thì **sửa xong hãy sang lượt 2**. Đó là toàn bộ lý do smoke
-test tồn tại: bắt lỗi trước khi đốt 18 giờ GPU.
+test tồn tại: bắt lỗi trước khi đốt hàng giờ GPU.
 
-## Ngân sách GPU — vì sao cần 2 phiên
+## Ngân sách GPU — vì sao tách hai notebook
 
 Đo thật ở lượt huấn luyện trước: **1,42 giây/bước** trên T4.
 
-| Nhóm | Thí nghiệm | Số seed | Số lượt |
+| Notebook | Thí nghiệm | Số lượt | Thời gian |
 |---|---|---|---|
-| Đối chứng | bản cải tiến | 2 | 2 |
-| A0 | vanilla 2017 vs cải tiến | 2 | 2 |
-| TASK 17 | A1 LayerNorm · A4 sin-cos · A5 ReLU · A6 Post-Norm | 2 | 8 |
-| TASK 18 | A2 warmup · A3 label smoothing | 1 | 2 |
-| | | | **14 lượt** |
+| **03 — nhóm chính** | đối chứng · A0 vanilla · A1 LayerNorm | 6 | ~7 giờ |
+| **04 — nhóm phụ** | A4 sin-cos · A5 ReLU · A6 Post-Norm · A2 · A3 | 8 | ~9,5 giờ |
+| | | **14** | **~17 giờ** |
 
-14 lượt × 3.000 bước × 1,42 giây ≈ **17 giờ**, cộng thời gian chấm BLEU.
-Phiên Kaggle bị cắt ở **12 giờ**, quota **30 giờ/tuần**.
+Gộp cả 14 lượt vào một notebook là **17 giờ**, mà phiên Kaggle bị cắt ở **12 giờ**
+và quota chỉ **30 giờ/tuần**. Tách hai để mỗi notebook vừa gọn một phiên.
 
-Nên `GIO_TOI_DA = 9.0`: chạy được lượt nào hay lượt đó, xong lượt nào là đẩy kết
-quả lên Hub ngay. **Phiên sau Run All lại là tự bỏ qua những lượt đã xong.**
+Chia theo **mức quan trọng** chứ không chia đôi cho đều: hết quota giữa chừng thì
+thứ mất đi phải là thứ ít đau nhất, không phải thứ thầy hỏi.
+
+`GIO_TOI_DA = 9.0`: chạy được lượt nào hay lượt đó, xong lượt nào là đẩy kết quả
+lên Hub ngay. **Run All lại ở phiên sau là tự bỏ qua những lượt đã xong.**
 Notebook crash giữa chừng cũng không mất gì.
 
 ## Trước khi bấm Run All, kiểm đủ 4 thứ
@@ -157,9 +195,13 @@ print("Cài đặt xong.")
     code(r'''
 # ===================== CÔNG TẮC =====================
 
-SMOKE_TEST = True      # True: 14 lượt x 60 bước, ~10 phút. False: chạy thật.
+SMOKE_TEST = True      # True: __SO_LUOT__ lượt x 60 bước, ~5 phút. False: chạy thật.
 
 REPO_HUB = "mgbao/envi-nmt-scratch-transformer"    # ĐỔI THÀNH TÀI KHOẢN HF CỦA CẬU
+
+# Notebook này chạy nhóm nào. ĐỪNG SỬA — mỗi notebook đã gắn sẵn nhóm của nó,
+# đổi ở đây là hai notebook giẫm lên nhau.
+NHOM = "__NHOM__"
 
 # NGÂN SÁCH BƯỚC — dùng chung cho MỌI thí nghiệm.
 # Đây là con số quan trọng nhất của cả notebook: ablation chỉ có nghĩa khi mọi
@@ -352,7 +394,7 @@ Hết giờ hoặc notebook crash thì **Run All lại**: những lượt đã x
 """),
     code(r'''
 lenh = (f"python scripts/chay_ablation.py --so-buoc {NGAN_SACH_BUOC} "
-        f"--repo-hub {REPO_HUB} --gio-toi-da {GIO_TOI_DA}")
+        f"--repo-hub {REPO_HUB} --gio-toi-da {GIO_TOI_DA} --nhom {NHOM}")
 if SMOKE_TEST:
     lenh += " --smoke"
 if CHI_THI_NGHIEM:
@@ -416,25 +458,61 @@ for f in sorted(liet_ke_file(REPO_HUB)):
 ]
 
 
-def main() -> None:
-    notebook = {
-        "cells": CAC_CELL,
-        "metadata": {
-            "kernelspec": {"display_name": "Python 3", "language": "python",
-                           "name": "python3"},
-            "language_info": {"name": "python", "version": "3.11"},
-            "accelerator": "GPU",
-        },
-        "nbformat": 4,
-        "nbformat_minor": 5,
+def thay_cho_nhom(cells: list[dict], ten_nhom: str) -> list[dict]:
+    """Điền chỗ trống của khuôn cho đúng nhóm.
+
+    Hai notebook giống hệt nhau trừ bốn chỗ, nên giữ MỘT khuôn rồi thay chỗ
+    trống. Chép thành hai khuôn riêng thì sửa một chỗ phải nhớ sửa cả hai, và
+    cái quên sửa là cái sẽ hỏng — đúng mục 2.15 Sưu tập lỗi.
+    """
+    t = NHOM[ten_nhom]
+    thay = {
+        "__TIEU_DE__": t["tieu_de"],
+        "__MO_TA__": t["mo_ta"],
+        "__SO_LUOT__": str(t["so_luot"]),
+        "__GIO__": t["gio"],
+        "__NHOM__": ten_nhom,
     }
-    DUONG_DAN.parent.mkdir(parents=True, exist_ok=True)
-    DUONG_DAN.write_text(json.dumps(notebook, ensure_ascii=False, indent=1),
-                         encoding="utf-8")
-    so_code = sum(1 for c in CAC_CELL if c["cell_type"] == "code")
-    print(f"Đã sinh {DUONG_DAN.relative_to(GOC)}")
-    print(f"  {len(CAC_CELL)} cell ({so_code} cell mã, "
-          f"{len(CAC_CELL) - so_code} cell chữ)")
+    ra = []
+    for c in cells:
+        noi_dung = "".join(c["source"])
+        for cho_trong, gia_tri in thay.items():
+            noi_dung = noi_dung.replace(cho_trong, gia_tri)
+        ra.append({**c, "source": noi_dung.splitlines(keepends=True)})
+    return ra
+
+
+def main() -> None:
+    for ten_nhom, thong_tin in NHOM.items():
+        cells = thay_cho_nhom(CAC_CELL, ten_nhom)
+        notebook = {
+            "cells": cells,
+            "metadata": {
+                "kernelspec": {"display_name": "Python 3", "language": "python",
+                               "name": "python3"},
+                "language_info": {"name": "python", "version": "3.11"},
+                "accelerator": "GPU",
+            },
+            "nbformat": 4,
+            "nbformat_minor": 5,
+        }
+        duong_dan = GOC / "notebooks" / thong_tin["file"]
+        duong_dan.parent.mkdir(parents=True, exist_ok=True)
+        duong_dan.write_text(json.dumps(notebook, ensure_ascii=False, indent=1),
+                             encoding="utf-8")
+
+        # Còn sót chỗ trống nào là notebook in ra chữ "__NHOM__" giữa bài, hoặc
+        # tệ hơn, truyền chuỗi đó làm tham số dòng lệnh. Chặn ngay tại đây.
+        con_sot = [k for k in ("__TIEU_DE__", "__MO_TA__", "__SO_LUOT__",
+                               "__GIO__", "__NHOM__")
+                   if k in duong_dan.read_text(encoding="utf-8")]
+        if con_sot:
+            raise SystemExit(f"Còn chỗ trống chưa điền trong {duong_dan.name}: {con_sot}")
+
+        so_code = sum(1 for c in cells if c["cell_type"] == "code")
+        print(f"Đã sinh {duong_dan.relative_to(GOC)}")
+        print(f"  nhóm {ten_nhom} · {thong_tin['so_luot']} lượt · {thong_tin['gio']} · "
+              f"{len(cells)} cell ({so_code} mã)")
 
 
 if __name__ == "__main__":

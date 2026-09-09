@@ -52,15 +52,33 @@ for _luong in (sys.stdout, sys.stderr):
 #   TASK 18 (kỹ thuật huấn luyện) không đòi 2 seed, nên chạy 1 để dành GPU.
 #   A0 được 2 seed vì đây là thí nghiệm chủ đạo thầy đề nghị.
 # =============================================================================
+#
+# CHIA LÀM HAI NHÓM ĐỂ CHẠY HAI PHIÊN RIÊNG.
+# 14 lượt x 3.000 bước là ~17 giờ, vượt mức cắt 12 giờ của một phiên Kaggle.
+# Xếp theo mức quan trọng để nếu hết quota giữa chừng thì thứ mất đi là thứ ít
+# đau nhất, chứ không phải thứ thầy hỏi.
+#
+#   "chinh" — 6 lượt, ~7 giờ, vừa MỘT phiên. Thiếu nhóm này là không có báo cáo.
+#       doi_chung  đối chứng của MỌI so sánh. Không có nó thì mọi bảng vô nghĩa
+#       a0         vanilla 2017 vs cải tiến — thầy đề nghị trực tiếp, là thí
+#                  nghiệm biến đồ án từ "code lại Transformer" thành thực nghiệm
+#       a1         RMSNorm vs LayerNorm — mentor hỏi thẳng, và chính file
+#                  ablation_a1_layernorm.yaml ghi "ƯU TIÊN CAO NHẤT, giữ lại kể
+#                  cả khi phải thu gọn ablation"
+#
+#   "phu" — 8 lượt, ~9,5 giờ, phiên thứ hai. Vẫn cần cho TASK 17/18 nhưng không
+#       ai hỏi trực tiếp, và thiếu thì báo cáo vẫn đứng được.
+#
 THI_NGHIEM = [
-    ("doi_chung", "configs/base.yaml",                        [42, 1337]),
-    ("a0",        "configs/ablation_a0_vanilla.yaml",         [42, 1337]),
-    ("a1",        "configs/ablation_a1_layernorm.yaml",       [42, 1337]),
-    ("a4",        "configs/ablation_a4_sincos.yaml",          [42, 1337]),
-    ("a5",        "configs/ablation_a5_relu.yaml",            [42, 1337]),
-    ("a6",        "configs/ablation_a6_post_norm.yaml",       [42, 1337]),
-    ("a2",        "configs/ablation_a2_warmup.yaml",          [42]),
-    ("a3",        "configs/ablation_a3_label_smoothing.yaml", [42]),
+    #  mã          file cấu hình                                seed         nhóm
+    ("doi_chung", "configs/base.yaml",                        [42, 1337], "chinh"),
+    ("a0",        "configs/ablation_a0_vanilla.yaml",         [42, 1337], "chinh"),
+    ("a1",        "configs/ablation_a1_layernorm.yaml",       [42, 1337], "chinh"),
+    ("a4",        "configs/ablation_a4_sincos.yaml",          [42, 1337], "phu"),
+    ("a5",        "configs/ablation_a5_relu.yaml",            [42, 1337], "phu"),
+    ("a6",        "configs/ablation_a6_post_norm.yaml",       [42, 1337], "phu"),
+    ("a2",        "configs/ablation_a2_warmup.yaml",          [42],       "phu"),
+    ("a3",        "configs/ablation_a3_label_smoothing.yaml", [42],       "phu"),
 ]
 
 THU_MUC_KET_QUA = GOC / "results" / "ablation"
@@ -151,6 +169,11 @@ def main() -> None:
     parser.add_argument("--repo-hub", default=None)
     parser.add_argument("--gio-toi-da", type=float, default=None,
                         help="tự dừng cả loạt khi sắp hết giờ phiên Kaggle")
+    parser.add_argument("--nhom", choices=["chinh", "phu", "tat_ca"], default="tat_ca",
+                        help="chinh = 6 lượt quan trọng nhất (đối chứng, A0, A1), "
+                             "vừa MỘT phiên Kaggle. phu = 8 lượt còn lại, phiên "
+                             "thứ hai. Chia vậy để hết quota giữa chừng thì thứ "
+                             "mất đi là thứ ít đau nhất.")
     parser.add_argument("--chi-thi-nghiem", nargs="*", default=None,
                         help="chỉ chạy vài mã, ví dụ: --chi-thi-nghiem doi_chung a0")
     parser.add_argument("--bo-qua-danh-gia", action="store_true",
@@ -160,13 +183,47 @@ def main() -> None:
     so_buoc = 60 if args.smoke else args.so_buoc
     bat_dau = time.perf_counter()
 
-    ke_hoach = [(ma, cfg, seed)
-                for ma, cfg, seeds in THI_NGHIEM
-                for seed in seeds
-                if args.chi_thi_nghiem is None or ma in args.chi_thi_nghiem]
+    # KÉO BẢNG KẾT QUẢ TỪ HUB VỀ TRƯỚC KHI CHẠY.
+    # Không có bước này thì notebook thứ hai khởi động với bảng trắng: nó không
+    # biết notebook thứ nhất đã chạy xong những gì, nên chạy lại từ đầu; và tệ
+    # hơn, báo cáo cuối sẽ thiếu hẳn hàng đối chứng nên mọi so sánh mất gốc.
+    if args.repo_hub and not DUONG_DAN_KET_QUA.exists():
+        try:
+            from nmt.training.checkpoint import CHE_DO_SMOKE, CHE_DO_THAT
+            from nmt.training.hub_sync import tai_file
 
+            ten_hub = ("smoke/ablation/ket_qua.csv" if args.smoke
+                       else "ablation/ket_qua.csv")
+            THU_MUC_KET_QUA.mkdir(parents=True, exist_ok=True)
+            # tai_file GIỮ NGUYÊN cấu trúc thư mục của Hub, nên file rơi vào
+            # <thu_muc_luu>/ablation/ket_qua.csv chứ không phải thẳng vào
+            # thu_muc_luu. Tải về chỗ tạm rồi chép sang đúng vị trí, thay vì
+            # đoán — đoán sai thì script tưởng Hub chưa có gì và chạy lại từ đầu.
+            tam = GOC / ".hub_tam"
+            ve = tai_file(args.repo_hub, ten_hub, tam)
+            if ve and Path(ve).exists():
+                shutil.copy2(ve, DUONG_DAN_KET_QUA)
+                da_co = len(pd.read_csv(DUONG_DAN_KET_QUA))
+                print(f"[ablation] Đã kéo bảng cũ từ Hub ({ten_hub}): "
+                      f"{da_co} lượt đã xong từ phiên trước.")
+            else:
+                print(f"[ablation] Hub chưa có {ten_hub} — bắt đầu bảng mới.")
+            shutil.rmtree(tam, ignore_errors=True)
+        except Exception as loi:
+            print(f"[ablation] Không kéo được bảng cũ: {type(loi).__name__}: {loi}")
+
+    ke_hoach = [(ma, cfg, seed)
+                for ma, cfg, seeds, nhom in THI_NGHIEM
+                for seed in seeds
+                if (args.nhom in ("tat_ca", nhom))
+                and (args.chi_thi_nghiem is None or ma in args.chi_thi_nghiem)]
+
+    ten_nhom = {"chinh": "NHÓM CHÍNH (đối chứng · A0 vanilla · A1 LayerNorm)",
+                "phu": "NHÓM PHỤ (A4 · A5 · A6 · A2 · A3)",
+                "tat_ca": "TẤT CẢ"}[args.nhom]
     print(f"\n{'#' * 78}")
-    print(f"# ABLATION — {len(ke_hoach)} lượt · {so_buoc:,} bước mỗi lượt"
+    print(f"# ABLATION — {ten_nhom}")
+    print(f"# {len(ke_hoach)} lượt · {so_buoc:,} bước mỗi lượt"
           f"{' · SMOKE TEST' if args.smoke else ''}")
     print("# Ngân sách bước BẰNG NHAU giữa mọi thí nghiệm — điều kiện để so sánh")
     print(f"{'#' * 78}", flush=True)
@@ -261,7 +318,12 @@ def main() -> None:
                                  "--config", duong_dan_cfg, "--seed", str(seed),
                                  "--checkpoint", str(ck), "--split", split]
                     if args.smoke:
-                        lenh_cham.append("--cho-phep-smoke")
+                        # Smoke chấm 64 câu thay vì đủ 1.553 dev + 1.268 test.
+                        # Chấm đủ cho MỖI lượt, nhân 14 lượt, thì phần chấm điểm
+                        # lâu hơn cả phần huấn luyện — smoke test thành thứ chậm
+                        # nhất quy trình, ngược hẳn mục đích của nó. 64 câu đủ
+                        # chứng minh đường chấm chạy được mà chỉ tốn vài giây.
+                        lenh_cham += ["--cho-phep-smoke", "--gioi-han-cau", "64"]
                     if _chay(lenh_cham, f"CHẤM ĐIỂM {ma} · seed {seed} · {split}"):
                         d = doc_diem_moi_nhat(ten_chay, split)
                         hang[f"bleu_{split}"] = d.get("bleu")

@@ -42,6 +42,14 @@ def main() -> None:
     parser.add_argument("--luu-vi-du", type=int, default=0,
                         help="ghi N câu dịch ra results/vi_du_dich.csv để dựng "
                              "bảng ví dụ trong báo cáo")
+    parser.add_argument("--gioi-han-cau", type=int, default=0,
+                        help="chỉ chấm N câu đầu. 0 = chấm đủ cả tập. "
+                             "Dùng cho smoke test: chấm đủ 1.553 câu dev cộng "
+                             "1.268 câu test cho MỖI lượt, nhân 14 lượt, thì "
+                             "phần chấm điểm lâu hơn cả phần huấn luyện — smoke "
+                             "test thành thứ chậm nhất quy trình, ngược hẳn mục "
+                             "đích của nó. ĐIỂM RA KHÔNG PHẢI KẾT QUẢ THẬT, chỉ "
+                             "để chứng minh đường chấm điểm chạy được.")
     args = parser.parse_args()
 
     cfg = nap_config(args.config)
@@ -65,7 +73,21 @@ def main() -> None:
     duong_dan_vi = f"{split_path}.vi"
     
     dataset = DuLieuSongNgu(duong_dan_en, duong_dan_vi, tokenizer)
-    loader = tao_dataloader(dataset, so_token_moi_batch=cfg.du_lieu.so_token_moi_batch, gom_theo_do_dai=False, tron=False)
+
+    if args.gioi_han_cau > 0:
+        dataset._src = dataset._src[: args.gioi_han_cau]
+        dataset._tgt = dataset._tgt[: args.gioi_han_cau]
+        print(f"CHỈ CHẤM {len(dataset)} CÂU ĐẦU — điểm dưới đây KHÔNG phải kết "
+              f"quả thật, chỉ để kiểm đường chấm điểm chạy được.")
+
+    # gom_theo_do_dai=True: xếp câu dài gần nhau nên mỗi batch bớt phần đệm.
+    # Sinh câu là vòng lặp tự hồi quy chạy tới khi câu DÀI NHẤT trong batch xong,
+    # nên một câu 100 token đứng chung với chín câu 10 token bắt cả batch chạy đủ
+    # 100 bước. Xếp theo độ dài cắt được phần lãng phí đó.
+    # KHÔNG ảnh hưởng tới điểm: câu dịch và câu tham chiếu lấy ra từ cùng một
+    # batch nên vẫn khớp cặp; sacrebleu chấm theo cặp chứ không theo thứ tự.
+    loader = tao_dataloader(dataset, so_token_moi_batch=cfg.du_lieu.so_token_moi_batch,
+                            gom_theo_do_dai=True, tron=False)
 
     if torch.cuda.is_available():
         device = torch.device("cuda")
