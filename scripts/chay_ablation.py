@@ -221,8 +221,20 @@ def main() -> None:
                 "--danh-gia-moi", str(max(10, so_buoc // 6))]
         if args.smoke:
             lenh.append("--smoke")
-        if args.repo_hub:
+
+        # SMOKE CHỈ ĐẨY CHECKPOINT Ở LƯỢT ĐẦU TIÊN.
+        # Mỗi checkpoint là 549 MB. Đẩy cả 14 lượt là 7,7 GB, khiến smoke test
+        # mất hơn 40 phút — mà huấn luyện chỉ tốn một phút mỗi lượt, phần còn
+        # lại là thời gian upload. Nó cũng bơm 12,7 GB rác vĩnh viễn vào repo Hub.
+        # Lượt đầu đã chứng minh xong cơ chế đẩy hoạt động; 13 lượt sau chỉ lặp
+        # lại đúng lời chứng minh đó với giá 7 GB băng thông.
+        # Bảng ket_qua.csv vẫn được đẩy sau MỖI lượt (vài trăm byte), nên cơ chế
+        # chạy tiếp vẫn được kiểm đầy đủ.
+        if args.repo_hub and (not args.smoke or da_chay == 0):
             lenh += ["--repo-hub", args.repo_hub]
+        elif args.smoke:
+            print("[ablation] Smoke: bỏ đẩy checkpoint 549 MB lên Hub "
+                  "(lượt đầu đã kiểm xong cơ chế).", flush=True)
         if args.gio_toi_da:
             # Chừa lại phần giờ đã tiêu, để lượt này không ăn lẹm sang giờ lưu.
             con_lai = args.gio_toi_da - (time.perf_counter() - bat_dau) / 3600

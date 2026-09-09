@@ -67,7 +67,24 @@ def build_positional(cfg):
     án mà không sửa dòng code nào, và ablation A4 của TASK 17 chạy được.
     """
     model_cfg = cfg.mo_hinh
-    max_len = cfg.du_lieu.do_dai_toi_da
+
+    # BẢNG VỊ TRÍ PHẢI ĐỦ DÀI CHO CHUỖI DÀI NHẤT THẬT SỰ CHẠY QUA, chứ không
+    # phải cho du_lieu.do_dai_toi_da. Hai chỗ vượt qua con số đó:
+    #
+    #   huấn luyện : chuỗi đích là BOS + do_dai_toi_da token = do_dai_toi_da + 1
+    #   sinh câu   : chạy tới sinh_cau.do_dai_toi_da_khi_dich, mặc định 128
+    #
+    # Để nguyên max_len = 100 thì lần đánh giá đầu tiên đã chết:
+    #   ValueError: vị trí 101 vượt do_dai_toi_da đã cache (100)
+    #
+    # Lỗi này nằm im từ đầu dự án vì lượt chạy chính dùng RoPE, mà nhánh RoPE
+    # không cộng bảng vị trí ở ngoài nên không chạm tới giới hạn. A0 và A4 là
+    # hai cấu hình ĐẦU TIÊN dùng sin-cos, nên chúng là hai lượt đầu tiên đâm
+    # vào nó — sau 40 phút smoke test.
+    max_len = max(
+        cfg.du_lieu.do_dai_toi_da + 1,              # +1 cho token BOS
+        cfg.sinh_cau.do_dai_toi_da_khi_dich,
+    )
 
     if model_cfg.ma_hoa_vi_tri == "rope":
         rope = RoPE(

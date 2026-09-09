@@ -211,6 +211,38 @@ def test_beam_tra_ve_du_so_cau(cfg_goc):
     assert (kq[:, 0] == BOS).all(), "Mọi câu trả về đều phải bắt đầu bằng <bos>"
 
 
+@pytest.mark.parametrize("ma_hoa_vi_tri", ["rope", "sinusoidal"])
+def test_bang_vi_tri_du_dai_cho_chuoi_dai_nhat(cfg_goc, ma_hoa_vi_tri):
+    """Bảng vị trí phải đủ chỗ cho chuỗi DÀI NHẤT thật sự chạy qua mô hình.
+
+    Hai chỗ vượt quá du_lieu.do_dai_toi_da:
+      huấn luyện : chuỗi đích là BOS + do_dai_toi_da token = do_dai_toi_da + 1
+      sinh câu   : chạy tới sinh_cau.do_dai_toi_da_khi_dich, mặc định 128
+
+    Bản cũ dựng bảng đúng bằng do_dai_toi_da nên lần đánh giá đầu tiên đã chết:
+        ValueError: vị trí 101 vượt do_dai_toi_da đã cache (100)
+
+    Lỗi nằm im suốt từ đầu dự án vì lượt chạy chính dùng RoPE, mà nhánh RoPE
+    không cộng bảng vị trí ở ngoài nên không chạm giới hạn. Nó chỉ nổ khi A0 và
+    A4 chạy — hai cấu hình sin-cos đầu tiên — và nổ sau 40 phút smoke test trên
+    Kaggle. Bài test này chạy trong vài giây và bắt đúng nó.
+    """
+    from nmt.model.masking import tao_causal_mask
+
+    cfg = _cfg_nho(cfg_goc, ma_hoa_vi_tri=ma_hoa_vi_tri)
+    model = _dung_model(cfg)
+
+    dai_nhat = max(cfg.du_lieu.do_dai_toi_da + 1, cfg.sinh_cau.do_dai_toi_da_khi_dich)
+    src = torch.randint(4, 64, (2, cfg.du_lieu.do_dai_toi_da))
+    tgt = torch.randint(4, 64, (2, dai_nhat))
+    src_mask = torch.ones(2, 1, 1, src.size(1), dtype=torch.bool)
+
+    with torch.no_grad():
+        logits = model(src, tgt, src_mask, tao_causal_mask(tgt.size(1)))
+
+    assert logits.shape[:2] == (2, dai_nhat)
+
+
 def test_beam_size_khong_hop_le_thi_bao_loi(cfg_goc):
     """beam_size = 0 phải ném lỗi ngay chứ không lặng lẽ trả về tensor rỗng."""
     from nmt.inference.search import beam_search
