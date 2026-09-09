@@ -14,13 +14,18 @@
 
 | Tập | BLEU | chrF++ | Cách sinh câu |
 |---|---|---|---|
-| tst2012 (dev) | _chưa có_ | _chưa có_ | Greedy |
-| tst2013 (test) | _chưa có_ | _chưa có_ | Greedy |
-| tst2013 (test) | _chưa có_ | _chưa có_ | Beam = 4 |
+| tst2012 (dev, 1.553 câu) | 26,24 | 45,57 | Greedy + KV cache |
+| tst2013 (test, 1.268 câu) | 29,74 | 48,73 | Greedy + KV cache |
+| tst2013 (test, 1.268 câu) | **30,69** | **49,60** | Beam = 4 + KV cache |
 
-Chuỗi chữ ký sacrebleu: _điền sau khi chạy TASK 16_
+BLEU signature: `nrefs:1|case:mixed|eff:no|tok:none|smooth:exp|version:2.6.0`.
+Corpus đã tokenized nên protocol chính dùng `tok:none`; xem
+[báo cáo đánh giá](docs/bao_cao_danh_gia.md).
 
 Mức đánh giá: **≥ 19** tối thiểu chấp nhận · **≥ 22** tốt · **≥ 29** rất tốt (trên tst2013).
+
+Báo cáo tổng hợp: [docs/bao_cao_cuoi.md](docs/bao_cao_cuoi.md) · slide bảo vệ
+15 trang: `results/ENVI_NMT_bao_ve.pptx` · demo local: <http://localhost:8501>.
 
 ---
 
@@ -54,7 +59,8 @@ python scripts/train_tokenizer.py --config configs/base.yaml
 python scripts/overfit_sanity.py  --config configs/base.yaml   # cổng chặn Phase 2
 python scripts/benchmark_speed.py --config configs/base.yaml
 python scripts/train.py           --config configs/base.yaml
-python scripts/evaluate.py        --config configs/base.yaml
+python scripts/evaluate.py        --config configs/iwslt_base_v1_seed42.yaml \
+  --checkpoint checkpoints/iwslt_base_v1_seed42/tot_nhat.pt --kv-cache
 ```
 
 ---

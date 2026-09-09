@@ -3,7 +3,7 @@
 # (On Layer Normalization in the Transformer Architecture, arxiv 2002.04745).
 # Nên chênh lệch rất nhỏ là KẾT QUẢ LÝ THUYẾT ĐÃ DỰ ĐOÁN, không phải bug,
 # cũng không phải ablation thất bại. Viết thẳng điều này vào báo cáo kèm trích dẫn.
-ke_thua: base.yaml
+ke_thua: baseline_cai_tien_6000.yaml
 thi_nghiem:
   ten: a2_warmup_bat
 toi_uu:

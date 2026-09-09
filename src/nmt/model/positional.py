@@ -106,12 +106,14 @@ class MaHoaViTriSinCos(nn.Module):
         pe[:, 1::2] = torch.cos(goc)
         self.register_buffer("pe", pe.unsqueeze(0), persistent=False)   # (1, L, d_model)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, vi_tri_bat_dau: int = 0) -> torch.Tensor:
         """x: (batch, seq_len, d_model) -> cùng kích thước."""
         seq_len = x.shape[1]
-        if seq_len > self.pe.shape[1]:
+        vi_tri_ket_thuc = vi_tri_bat_dau + seq_len
+        if vi_tri_ket_thuc > self.pe.shape[1]:
             raise ValueError(
-                f"seq_len ({seq_len}) vượt do_dai_toi_da đã cache ({self.pe.shape[1]}) của positional encoding"
+                f"Vị trí kết thúc ({vi_tri_ket_thuc}) vượt do_dai_toi_da đã "
+                f"cache ({self.pe.shape[1]}) của positional encoding"
             )
-        x = x + self.pe[:, :seq_len, :].to(dtype=x.dtype)
+        x = x + self.pe[:, vi_tri_bat_dau:vi_tri_ket_thuc, :].to(dtype=x.dtype)
         return self.dropout(x)

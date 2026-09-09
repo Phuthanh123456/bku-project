@@ -81,6 +81,7 @@ output_kaggle_huggingface/
 # Phủ định phải đặt SAU các dòng chặn ở trên thì mới thắng.
 !results/*.csv
 !results/*.png
+!results/*.pptx
 !results/*.yaml
 !results/bao_cao/
 !results/bao_cao/**

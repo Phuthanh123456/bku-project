@@ -109,3 +109,53 @@ class MultiHeadAttention(nn.Module):
         dau_ra, trong_so_attention = attention_tich_vo_huong(q, k, v, mask, self.dropout)
         dau_ra = self.w_o(self._gop_head(dau_ra))
         return dau_ra, trong_so_attention
+
+    def forward_cached(
+        self,
+        query: torch.Tensor,
+        key: torch.Tensor,
+        value: torch.Tensor,
+        mask: torch.Tensor | None = None,
+        rope=None,
+        vi_tri_bat_dau: int = 0,
+        cache: tuple[torch.Tensor, torch.Tensor] | None = None,
+        static_kv: bool = False,
+    ) -> tuple[
+        torch.Tensor,
+        torch.Tensor,
+        tuple[torch.Tensor, torch.Tensor],
+    ]:
+        """Attention một bước kèm KV cache dùng khi sinh câu.
+
+        ``static_kv=True`` dành cho cross-attention: key/value của encoder chỉ
+        chiếu đúng một lần rồi tái sử dụng. Với self-attention, key/value của
+        token hiện tại được nối vào phần quá khứ đã cache.
+        """
+        q = self._tach_head(self.w_q(query))
+
+        if static_kv and cache is not None:
+            k, v = cache
+        else:
+            k_moi = self._tach_head(self.w_k(key))
+            v_moi = self._tach_head(self.w_v(value))
+
+            if rope is not None:
+                q = rope(q, vi_tri_bat_dau)
+                k_moi = rope(k_moi, vi_tri_bat_dau)
+
+            if cache is not None and not static_kv:
+                k = torch.cat([cache[0], k_moi], dim=-2)
+                v = torch.cat([cache[1], v_moi], dim=-2)
+            else:
+                k, v = k_moi, v_moi
+
+        # Cross-attention không dùng RoPE; khi cache đã có, query vẫn chưa cần
+        # biến đổi. Nhánh này chỉ để API an toàn nếu static_kv được dùng chung.
+        if rope is not None and static_kv and cache is not None:
+            q = rope(q, vi_tri_bat_dau)
+
+        dau_ra, trong_so_attention = attention_tich_vo_huong(
+            q, k, v, mask, self.dropout
+        )
+        dau_ra = self.w_o(self._gop_head(dau_ra))
+        return dau_ra, trong_so_attention, (k, v)

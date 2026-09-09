@@ -28,14 +28,19 @@ from __future__ import annotations
 import sacrebleu
 
 
-def cham_bleu(du_doan: list[str], tham_chieu: list[str]) -> tuple[float, str]:
+def cham_bleu(
+    du_doan: list[str], tham_chieu: list[str], tokenize: str = "none"
+) -> tuple[float, str]:
     """Returns: (điểm BLEU, chuỗi chữ ký của sacrebleu).
 
     sacrebleu nhận NHIỀU bản dịch chuẩn cho mỗi câu, nên tham chiếu phải bọc
     thêm một lớp list: `[tham_chieu]` nghĩa là "một bộ tham chiếu duy nhất".
     """
     _kiem_dau_vao(du_doan, tham_chieu)
-    metric = sacrebleu.BLEU()
+    # Corpus IWSLT trong repo đã có khoảng trắng tách dấu câu. Chạy tokenizer
+    # 13a thêm lần nữa làm signature mô tả sai protocol và SacreBLEU cũng cảnh
+    # báo. ``none`` là phép chấm tokenized BLEU tương ứng với dữ liệu hiện có.
+    metric = sacrebleu.BLEU(tokenize=tokenize, force=(tokenize == "none"))
     diem = metric.corpus_score(du_doan, [tham_chieu])
     return diem.score, str(metric.get_signature())
 

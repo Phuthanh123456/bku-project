@@ -1,0 +1,29 @@
+# Baseline kiến trúc Transformer 2017, đã khớp ngân sách — vế B của phép so
+# tổng hợp mới theo góp ý cuối.
+#
+# Các lựa chọn kiến trúc gốc lấy từ Vaswani et al. (2017):
+#   - positional encoding sin-cos
+#   - LayerNorm sau residual (Post-Norm)
+#   - FFN dùng ReLU
+# Nguồn: https://arxiv.org/abs/1706.03762, mục 3.1, 3.3 và 3.5.
+#
+# d_ff dùng 1024 thay vì 2048 của bài báo để số tham số FFN gần bằng SwiGLU
+# d_ff=688 của hệ thống cải tiến (chênh dưới 1%). Vì vậy đây là baseline
+# KIẾN TRÚC vanilla đã khớp quy mô cho IWSLT, không phải tái lập nguyên xi thí
+# nghiệm WMT của bài báo.
+#
+# Mọi khóa dữ liệu, optimizer, dropout, batch, số bước và cách đánh giá kế thừa
+# nguyên vẹn từ baseline_cai_tien_6000.yaml. A1..A6 vẫn là các thí nghiệm đơn
+# biến riêng; không dùng file này để thay thế chúng.
+ke_thua: baseline_cai_tien_6000.yaml
+
+thi_nghiem:
+  ten: baseline_vanilla_architecture_6000
+
+mo_hinh:
+  ma_hoa_vi_tri: sinusoidal
+  vi_tri_chuan_hoa: post
+  co_chuan_hoa_cuoi: false
+  kieu_chuan_hoa: layernorm
+  kieu_ffn: relu
+  d_ff: 1024

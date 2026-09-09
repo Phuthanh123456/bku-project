@@ -5,7 +5,7 @@
 # Cảnh báo: Post-Norm gần như bắt buộc phải có warmup, nếu không thì loss
 # phân kỳ ngay những bước đầu. Nếu A6 phân kỳ với scheduler = co_dinh thì
 # ĐÓ CHÍNH LÀ KẾT QUẢ, hãy ghi lại chứ đừng lặng lẽ bật warmup lên.
-ke_thua: base.yaml
+ke_thua: baseline_cai_tien_6000.yaml
 thi_nghiem:
   ten: a6_post_norm
 mo_hinh:

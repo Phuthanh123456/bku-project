@@ -77,7 +77,17 @@ def main() -> None:
     dataset = DuLieuSongNgu(cfg.du_lieu.train + ".en", cfg.du_lieu.train + ".vi", tokenizer)
     dataset._src = dataset._src[:50]
     dataset._tgt = dataset._tgt[:50]
-    loader = tao_dataloader(dataset, so_token_moi_batch=100000, gom_theo_do_dai=False, tron=False)
+    # Windows dùng multiprocessing theo cơ chế ``spawn``. Script này không cần
+    # worker phụ vì chỉ lấy đúng một batch 50 câu; để worker mặc định có thể
+    # khiến lần chạy pytest/full sanity treo rất lâu trên máy CPU Windows.
+    so_worker = 0 if sys.platform == "win32" else cfg.du_lieu.so_worker
+    loader = tao_dataloader(
+        dataset,
+        so_token_moi_batch=100000,
+        gom_theo_do_dai=False,
+        tron=False,
+        so_worker=so_worker,
+    )
 
     batch = next(iter(loader))
     if torch.cuda.is_available():

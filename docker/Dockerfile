@@ -15,19 +15,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY requirements-demo.txt .
 
 # Bản CPU của PyTorch, nhẹ hơn nhiều so với bản mặc định có CUDA
 RUN pip install --no-cache-dir --user \
         --extra-index-url https://download.pytorch.org/whl/cpu \
-        torch==2.5.1+cpu \
- && pip install --no-cache-dir --user \
-        tokenizers==0.21.0 \
-        sacrebleu==2.4.3 \
-        huggingface_hub==0.27.1 \
-        PyYAML==6.0.2 \
-        streamlit==1.41.1 \
-        matplotlib==3.10.0
+        torch==2.13.0+cpu \
+ && pip install --no-cache-dir --user -r requirements-demo.txt
 
 # ---------- tầng 2: image chạy thật ----------
 FROM python:3.11-slim

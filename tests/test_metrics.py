@@ -54,6 +54,7 @@ def test_chu_ky_bleu_co_du_thong_tin_de_doi_chieu():
 
     for phan in ("nrefs:", "case:", "tok:", "version:"):
         assert phan in chu_ky, f"Chữ ký BLEU thiếu '{phan}': {chu_ky}"
+    assert "tok:none" in chu_ky, "IWSLT trong repo đã tokenized, không được tokenize lần hai"
 
 
 def test_chu_ky_chrf_ghi_dung_la_chrf_cong_cong():

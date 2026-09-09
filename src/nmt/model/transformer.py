@@ -159,7 +159,7 @@ class TransformerNMT(nn.Module):
         with torch.no_grad():
             self.embedding.weight[self.pad_id].fill_(0.0)
 
-    def _embed(self, token_ids: torch.Tensor) -> torch.Tensor:
+    def _embed(self, token_ids: torch.Tensor, vi_tri_bat_dau: int = 0) -> torch.Tensor:
         """Tra embedding, nhân sqrt(d_model), cộng sin-cos nếu không dùng RoPE.
 
         Nhân sqrt(d_model) để độ lớn của embedding ngang với độ lớn của vector
@@ -168,7 +168,7 @@ class TransformerNMT(nn.Module):
         x = self.embedding(token_ids) * (self.d_model ** 0.5)
         if self.absolute_pe is not None:
             # MaHoaViTriSinCos đã có dropout bên trong nên không cộng thêm lần nữa.
-            return self.absolute_pe(x)
+            return self.absolute_pe(x, vi_tri_bat_dau=vi_tri_bat_dau)
         return self.dropout(x)
 
     def encode(self, src_ids, src_mask):
@@ -184,6 +184,33 @@ class TransformerNMT(nn.Module):
         for layer in self.decoder_layers:
             x = layer(x, bo_nho_encoder, self_mask=tgt_mask, cross_mask=src_mask, rope=self.rope)
         return self.decoder_final_norm(x)
+
+    def decode_step(
+        self,
+        tgt_token,
+        bo_nho_encoder,
+        src_mask,
+        caches=None,
+        vi_tri_bat_dau: int = 0,
+    ):
+        """Giải mã đúng một token và trả cache của tất cả decoder layer."""
+        if tgt_token.size(1) != 1:
+            raise ValueError("decode_step chỉ nhận đúng một token cho mỗi câu")
+
+        x = self._embed(tgt_token, vi_tri_bat_dau=vi_tri_bat_dau)
+        caches = caches or [None] * len(self.decoder_layers)
+        caches_moi = []
+        for layer, layer_cache in zip(self.decoder_layers, caches):
+            x, layer_cache_moi = layer.forward_step(
+                x,
+                bo_nho_encoder,
+                cross_mask=src_mask,
+                rope=self.rope,
+                vi_tri_bat_dau=vi_tri_bat_dau,
+                cache=layer_cache,
+            )
+            caches_moi.append(layer_cache_moi)
+        return self.decoder_final_norm(x), caches_moi
 
     def forward(self, src_ids, tgt_ids, src_mask=None, tgt_mask=None):
         """Returns: logits có kích thước (batch, len_tgt, vocab_size)."""

@@ -1,0 +1,17 @@
+# Baseline hệ thống cải tiến — vế A của phép so tổng hợp mới.
+#
+# Đây KHÔNG phải một ablation đơn biến A1..A6. File này đóng băng ngân sách
+# để so cả gói kiến trúc cải tiến với kiến trúc Transformer 2017 ở file
+# baseline_vanilla_architecture_6000.yaml.
+#
+# 6.000 là mốc checkpoint có loss dev tốt nhất của lượt train seed 42 đã ghi
+# nhận. Mọi vế so sánh phải chạy ĐÚNG 6.000 bước optimizer; không dùng early
+# stopping vì như vậy mỗi cấu hình có thể tiêu một ngân sách khác nhau.
+ke_thua: base.yaml
+
+thi_nghiem:
+  ten: baseline_cai_tien_6000
+
+huan_luyen:
+  so_buoc_toi_da: 6000
+  dung_som_sau: 100000

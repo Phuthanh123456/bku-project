@@ -1,0 +1,3 @@
+﻿runtime,thiết bị,search,beam size,KV cache,số câu,p50 (ms/câu),p95 (ms/câu),câu/giây,dung lượng model (MB),BLEU trên mẫu,chữ ký BLEU,checkpoint bước
+PyTorch,cpu,greedy,1,False,200,891.6330500505865,3469.43706498714,0.773136341802055,549.0037279129028,27.59593582715708,nrefs:1|case:mixed|eff:no|tok:none|smooth:exp|version:2.6.0,6000
+PyTorch,cpu,greedy,1,True,200,343.6224500183016,937.8726149792782,2.413310429299488,549.0037279129028,27.59593582715708,nrefs:1|case:mixed|eff:no|tok:none|smooth:exp|version:2.6.0,6000

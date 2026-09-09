@@ -334,3 +334,48 @@ class DecoderLayer(nn.Module):
         # 3. feed forward
         x = self.ffn_residual(x, self.ffn)
         return x
+
+    def forward_step(
+        self,
+        x,
+        encoder_memory,
+        cross_mask=None,
+        rope=None,
+        vi_tri_bat_dau: int = 0,
+        cache: dict | None = None,
+    ):
+        """Chạy một token decoder và trả KV cache mới của lớp này."""
+        cache = cache or {}
+        self_kv_moi = None
+        cross_kv_moi = None
+
+        def self_attention(h):
+            nonlocal self_kv_moi
+            dau_ra, _, self_kv_moi = self.self_attn.forward_cached(
+                h,
+                h,
+                h,
+                mask=None,
+                rope=rope,
+                vi_tri_bat_dau=vi_tri_bat_dau,
+                cache=cache.get("self"),
+            )
+            return dau_ra
+
+        x = self.self_attn_residual(x, self_attention)
+
+        def cross_attention(h):
+            nonlocal cross_kv_moi
+            dau_ra, _, cross_kv_moi = self.cross_attn.forward_cached(
+                h,
+                encoder_memory,
+                encoder_memory,
+                mask=cross_mask,
+                cache=cache.get("cross"),
+                static_kv=True,
+            )
+            return dau_ra
+
+        x = self.cross_attn_residual(x, cross_attention)
+        x = self.ffn_residual(x, self.ffn)
+        return x, {"self": self_kv_moi, "cross": cross_kv_moi}

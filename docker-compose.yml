@@ -13,8 +13,10 @@ services:
       # Checkpoint và tokenizer gắn từ ngoài vào, chỉ đọc.
       # Nhờ vậy đổi mô hình chỉ cần thay file, không phải build lại image.
       - ./artifacts:/app/artifacts:ro
+      - ./checkpoints:/app/checkpoints:ro
     environment:
-      - DUONG_DAN_CHECKPOINT=/app/artifacts/checkpoints/tot_nhat.pt
+      - DUONG_DAN_CHECKPOINT=/app/checkpoints/iwslt_base_v1_seed42/tot_nhat.pt
       - DUONG_DAN_TOKENIZER=/app/artifacts/tokenizer/tokenizer.json
-      - DUONG_DAN_CONFIG=/app/configs/base.yaml
+      - DUONG_DAN_CONFIG=/app/configs/iwslt_base_v1_seed42.yaml
+      - HF_MODEL_REPO=mgbao/envi-nmt-scratch-transformer
     restart: unless-stopped

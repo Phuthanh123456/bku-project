@@ -1,0 +1,17 @@
+﻿mã,seed,số bước,BLEU,chrF++,chữ ký BLEU,trạng thái
+improved,42,6000,29.740954664240974,48.72963817664526,nrefs:1|case:mixed|eff:no|tok:none|smooth:exp|version:2.6.0,đã đánh giá
+improved,1337,6000,,,CHƯA CÓ KẾT QUẢ,chưa train
+vanilla,42,6000,,,CHƯA CÓ KẾT QUẢ,chưa train
+vanilla,1337,6000,,,CHƯA CÓ KẾT QUẢ,chưa train
+a1,42,6000,,,CHƯA CÓ KẾT QUẢ,chưa train
+a1,1337,6000,,,CHƯA CÓ KẾT QUẢ,chưa train
+a2,42,6000,,,CHƯA CÓ KẾT QUẢ,chưa train
+a2,1337,6000,,,CHƯA CÓ KẾT QUẢ,chưa train
+a3,42,6000,,,CHƯA CÓ KẾT QUẢ,chưa train
+a3,1337,6000,,,CHƯA CÓ KẾT QUẢ,chưa train
+a4,42,6000,,,CHƯA CÓ KẾT QUẢ,chưa train
+a4,1337,6000,,,CHƯA CÓ KẾT QUẢ,chưa train
+a5,42,6000,,,CHƯA CÓ KẾT QUẢ,chưa train
+a5,1337,6000,,,CHƯA CÓ KẾT QUẢ,chưa train
+a6,42,6000,,,CHƯA CÓ KẾT QUẢ,chưa train
+a6,1337,6000,,,CHƯA CÓ KẾT QUẢ,chưa train

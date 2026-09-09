@@ -34,6 +34,18 @@ def main() -> None:
     parser.add_argument("--cho-phep-smoke", action="store_true",
                         help="Cho phép chấm điểm trên checkpoint của smoke test. "
                              "Mặc định TỪ CHỐI, vì điểm đó không phải kết quả thật.")
+    parser.add_argument("--search", choices=["greedy", "beam"], default=None,
+                        help="Ghi đè sinh_cau.cach trong config")
+    parser.add_argument("--beam-size", type=int, default=None)
+    parser.add_argument("--length-penalty", type=float, default=None)
+    parser.add_argument("--kv-cache", action="store_true",
+                        help="Bật KV cache khi giải mã")
+    parser.add_argument("--max-sentences", type=int, default=None,
+                        help="Chỉ chấm N câu đầu để kiểm nhanh; không ghi diem_chinh.csv")
+    parser.add_argument("--output", type=str, default=None,
+                        help="CSV lưu từng câu nguồn/tham chiếu/dự đoán")
+    parser.add_argument("--bleu-tokenizer", default="none", choices=["none", "13a"],
+                        help="Dữ liệu IWSLT đã tách token nên protocol chính dùng none")
     args = parser.parse_args()
 
     cfg = nap_config(args.config)
@@ -45,9 +57,10 @@ def main() -> None:
     import pandas as pd
     import os
     from datetime import datetime
+    from time import perf_counter
     from nmt.data import nap_tokenizer, DuLieuSongNgu, tao_dataloader, PAD_ID, BOS_ID, EOS_ID
     from nmt.model.transformer import TransformerNMT
-    from nmt.inference.search import greedy_search
+    from nmt.inference.search import beam_search, greedy_search
     from nmt.eval.metrics import cham_bleu, cham_chrf
 
     tokenizer = nap_tokenizer(cfg.du_lieu.tokenizer)
@@ -125,17 +138,55 @@ def main() -> None:
 
     model.eval()
     
+    cach_tim = args.search or cfg.sinh_cau.cach
+    beam_size = args.beam_size or cfg.sinh_cau.beam_size
+    length_penalty = (
+        args.length_penalty
+        if args.length_penalty is not None
+        else cfg.sinh_cau.he_so_phat_do_dai
+    )
+    dung_kv_cache = args.kv_cache or cfg.sinh_cau.dung_kv_cache
+    if args.max_sentences is not None and args.max_sentences <= 0:
+        raise SystemExit("--max-sentences phải là số nguyên dương")
+
     du_doan = []
     tham_chieu = []
+    cau_nguon = Path(duong_dan_en).read_text(encoding="utf-8").splitlines()
     
-    print(f"Bắt đầu dịch tập {args.split} ({len(dataset)} câu)...")
+    so_cau_can_cham = min(args.max_sentences or len(dataset), len(dataset))
+    print(
+        f"Bắt đầu dịch tập {args.split} ({so_cau_can_cham} câu) bằng "
+        f"{cach_tim}, KV cache={'bật' if dung_kv_cache else 'tắt'}..."
+    )
+    bat_dau = perf_counter()
     with torch.no_grad():
         for i, batch in enumerate(loader):
             src_ids = batch["src_ids"].to(device)
             src_mask = batch["src_mask"].to(device)
             labels = batch["labels"].to(device)
-            
-            preds_ids = greedy_search(model, src_ids, src_mask, BOS_ID, EOS_ID, do_dai_toi_da=cfg.sinh_cau.do_dai_toi_da_khi_dich)
+
+            con_lai = so_cau_can_cham - len(du_doan)
+            if con_lai <= 0:
+                break
+            if src_ids.size(0) > con_lai:
+                src_ids = src_ids[:con_lai]
+                src_mask = src_mask[:con_lai]
+                labels = labels[:con_lai]
+
+            if cach_tim == "beam":
+                preds_ids = beam_search(
+                    model, src_ids, src_mask, BOS_ID, EOS_ID,
+                    beam_size=beam_size,
+                    he_so_phat_do_dai=length_penalty,
+                    do_dai_toi_da=cfg.sinh_cau.do_dai_toi_da_khi_dich,
+                    dung_kv_cache=dung_kv_cache,
+                )
+            else:
+                preds_ids = greedy_search(
+                    model, src_ids, src_mask, BOS_ID, EOS_ID,
+                    do_dai_toi_da=cfg.sinh_cau.do_dai_toi_da_khi_dich,
+                    dung_kv_cache=dung_kv_cache,
+                )
             
             for p_ids, l_ids in zip(preds_ids, labels):
                 p_list = p_ids.tolist()
@@ -150,14 +201,33 @@ def main() -> None:
             if (i + 1) % 10 == 0:
                 print(f" Đã dịch xong batch {i + 1}/{len(loader)}")
 
-    bleu, bleu_sig = cham_bleu(du_doan, tham_chieu)
+    thoi_gian_giay = perf_counter() - bat_dau
+
+    bleu, bleu_sig = cham_bleu(du_doan, tham_chieu, tokenize=args.bleu_tokenizer)
     chrf, chrf_sig = cham_chrf(du_doan, tham_chieu)
     
     print(f"\nKẾT QUẢ TRÊN TẬP {args.split.upper()}:")
     print(f"BLEU:   {bleu:.2f}  (Chữ ký: {bleu_sig})")
     print(f"chrF++: {chrf:.2f}  (Chữ ký: {chrf_sig})")
+    print(f"Thời gian: {thoi_gian_giay:.1f}s ({len(du_doan) / max(thoi_gian_giay, 1e-9):.2f} câu/s)")
     
     os.makedirs("results", exist_ok=True)
+    ten_output = args.output or f"results/du_doan_{args.split}_{cach_tim}.csv"
+    pd.DataFrame({
+        "STT": range(1, len(du_doan) + 1),
+        "Câu nguồn (EN)": cau_nguon[:len(du_doan)],
+        "Tham chiếu (VI)": tham_chieu,
+        "Dự đoán (VI)": du_doan,
+    }).to_csv(ten_output, index=False, encoding="utf-8-sig")
+    print(f"Đã lưu từng câu dịch vào {ten_output}")
+
+    if len(du_doan) < len(dataset):
+        print(
+            "Đây là lượt kiểm nhanh chưa đủ tập; KHÔNG ghi vào "
+            "results/diem_chinh.csv để tránh lẫn với điểm chính thức."
+        )
+        return
+
     csv_path = "results/diem_chinh.csv"
     
     row = pd.DataFrame([{
@@ -174,13 +244,24 @@ def main() -> None:
         # hai cột này thì 12 lượt ablation cho ra 12 dòng nhìn y hệt nhau.
         "Bước": thong_tin_ck["buoc"] if thong_tin_ck else "",
         "Chế độ": thong_tin_ck["che_do"] if thong_tin_ck else "",
+        "Search": cach_tim,
+        "Beam size": beam_size if cach_tim == "beam" else 1,
+        "Length penalty": length_penalty if cach_tim == "beam" else "",
+        "KV cache": dung_kv_cache,
+        "Thời gian (giây)": thoi_gian_giay,
+        "BLEU tokenizer": args.bleu_tokenizer,
+        "Ghi chú": "protocol chính" if args.bleu_tokenizer == "none" else "đối chiếu phụ",
     }])
     
-    # Nối thêm (append) nếu file đã tồn tại
+    # Gộp theo tên cột để file cũ chưa có Search/KV/BLEU tokenizer vẫn được
+    # nâng schema đúng; append thô sẽ làm các giá trị lệch cột âm thầm.
     if os.path.exists(csv_path):
-        row.to_csv(csv_path, mode="a", header=False, index=False)
+        cu = pd.read_csv(csv_path)
+        pd.concat([cu, row], ignore_index=True).to_csv(
+            csv_path, index=False, encoding="utf-8-sig"
+        )
     else:
-        row.to_csv(csv_path, index=False)
+        row.to_csv(csv_path, index=False, encoding="utf-8-sig")
         
     print(f"Đã lưu kết quả vào {csv_path}")
 

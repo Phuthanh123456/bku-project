@@ -1,0 +1,4 @@
+split,truoc_loc,sau_loc,bi_loai,bi_rong,bi_trung,bi_qua_ngan,bi_qua_dai,bi_lech_do_dai,bi_ro_ri
+train,133317,131339,1978,151,1006,0,760,40,21
+tst2012,1553,1553,0,0,0,0,0,0,0
+tst2013,1268,1268,0,0,0,0,0,0,0

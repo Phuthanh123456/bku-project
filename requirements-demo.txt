@@ -1,0 +1,8 @@
+# Phụ thuộc tối thiểu cho demo CPU/Docker. Giữ torch cùng đời checkpoint.
+torch==2.13.0
+numpy==2.2.1
+PyYAML==6.0.2
+tokenizers==0.21.0
+huggingface_hub==0.27.1
+matplotlib==3.10.0
+streamlit==1.41.1
