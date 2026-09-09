@@ -460,9 +460,14 @@ def test_11_rope_khong_bi_ap_vao_cross_attention():
     original_forward = layer.cross_attn.forward
     rope_passed = [True]
     
-    def fake_forward(self, query, key, value, mask=None, rope=None, vi_tri_bat_dau=0):
+    # Chữ ký phải bám sát MultiHeadAttention.forward, kể cả hai tham số của KV
+    # cache thêm ở TASK 19. Thiếu một tham số là bài kiểm đỏ vì TypeError chứ
+    # không phải vì RoPE bị áp nhầm — tức là mất luôn thứ nó định canh.
+    def fake_forward(self, query, key, value, mask=None, rope=None,
+                     vi_tri_bat_dau=0, cache=None, noi_cache=True):
         rope_passed[0] = rope
-        return original_forward(query, key, value, mask, rope, vi_tri_bat_dau)
+        return original_forward(query, key, value, mask, rope, vi_tri_bat_dau,
+                                cache, noi_cache)
         
     layer.cross_attn.forward = types.MethodType(fake_forward, layer.cross_attn)
     layer.forward(tgt, mem, self_mask=None, cross_mask=None, rope=rope)

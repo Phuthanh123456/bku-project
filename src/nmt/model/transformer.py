@@ -159,16 +159,20 @@ class TransformerNMT(nn.Module):
         with torch.no_grad():
             self.embedding.weight[self.pad_id].fill_(0.0)
 
-    def _embed(self, token_ids: torch.Tensor) -> torch.Tensor:
+    def _embed(self, token_ids: torch.Tensor, vi_tri_bat_dau: int = 0) -> torch.Tensor:
         """Tra embedding, nhân sqrt(d_model), cộng sin-cos nếu không dùng RoPE.
 
         Nhân sqrt(d_model) để độ lớn của embedding ngang với độ lớn của vector
         vị trí sin-cos, đúng như bản 2017 mô tả.
+
+        vi_tri_bat_dau phải được truyền xuống sin-cos khi sinh câu có KV cache,
+        nếu không thì mọi token đều nhận vector vị trí 0 — xem chú thích dài
+        trong MaHoaViTriSinCos.forward.
         """
         x = self.embedding(token_ids) * (self.d_model ** 0.5)
         if self.absolute_pe is not None:
             # MaHoaViTriSinCos đã có dropout bên trong nên không cộng thêm lần nữa.
-            return self.absolute_pe(x)
+            return self.absolute_pe(x, vi_tri_bat_dau)
         return self.dropout(x)
 
     def encode(self, src_ids, src_mask):
@@ -178,11 +182,18 @@ class TransformerNMT(nn.Module):
             x = layer(x, mask=src_mask, rope=self.rope)
         return self.encoder_final_norm(x)
 
-    def decode(self, tgt_ids, bo_nho_encoder, tgt_mask, src_mask):
-        """tgt_ids: (batch, len_tgt) tới (batch, len_tgt, d_model)."""
-        x = self._embed(tgt_ids)
-        for layer in self.decoder_layers:
-            x = layer(x, bo_nho_encoder, self_mask=tgt_mask, cross_mask=src_mask, rope=self.rope)
+    def decode(self, tgt_ids, bo_nho_encoder, tgt_mask, src_mask,
+               vi_tri_bat_dau: int = 0, cache: dict | None = None):
+        """tgt_ids: (batch, len_tgt) tới (batch, len_tgt, d_model).
+
+        cache là dict {chỉ số lớp: kho KV của lớp đó}, dùng cho TASK 19. Truyền
+        vào một dict rỗng ở bước đầu rồi truyền lại chính nó ở các bước sau.
+        """
+        x = self._embed(tgt_ids, vi_tri_bat_dau)
+        for i, layer in enumerate(self.decoder_layers):
+            cache_lop = None if cache is None else cache.setdefault(i, {})
+            x = layer(x, bo_nho_encoder, self_mask=tgt_mask, cross_mask=src_mask,
+                      rope=self.rope, vi_tri_bat_dau=vi_tri_bat_dau, cache=cache_lop)
         return self.decoder_final_norm(x)
 
     def forward(self, src_ids, tgt_ids, src_mask=None, tgt_mask=None):

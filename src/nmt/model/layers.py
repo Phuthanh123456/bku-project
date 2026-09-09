@@ -317,10 +317,19 @@ class DecoderLayer(nn.Module):
         self.cross_attn_residual = _build_residual(model_cfg)
         self.ffn_residual = _build_residual(model_cfg)
 
-    def forward(self, x, encoder_memory, self_mask, cross_mask=None, rope=None):
-        """x: (batch, len_tgt, d_model) tới cùng kích thước."""
+    def forward(self, x, encoder_memory, self_mask, cross_mask=None, rope=None,
+                vi_tri_bat_dau: int = 0, cache: dict | None = None):
+        """x: (batch, len_tgt, d_model) tới cùng kích thước.
+
+        cache là kho KV của RIÊNG lớp này (TASK 19), gồm hai ngăn tách biệt:
+        "self" nối thêm mỗi bước, "cross" tính một lần rồi dùng lại.
+        """
+        cache_self = None if cache is None else cache.setdefault("self", {})
+        cache_cross = None if cache is None else cache.setdefault("cross", {})
+
         # 1. masked self-attention — CÓ áp RoPE
-        x = self.self_attn_residual(x, lambda h: self.self_attn(h, h, h, self_mask, rope)[0])
+        x = self.self_attn_residual(x, lambda h: self.self_attn(
+            h, h, h, self_mask, rope, vi_tri_bat_dau, cache_self, noi_cache=True)[0])
 
         # 2. cross-attention — query lấy từ x, key và value lấy từ encoder_memory.
         #    rope=None là CÓ CHỦ ĐÍCH chứ không phải quên: query nằm ở câu tiếng
@@ -328,7 +337,8 @@ class DecoderLayer(nn.Module):
         #    Xem bài kiểm tra số 11.
         x = self.cross_attn_residual(
             x,
-            lambda h: self.cross_attn(h, encoder_memory, encoder_memory, cross_mask, None)[0],
+            lambda h: self.cross_attn(h, encoder_memory, encoder_memory, cross_mask,
+                                      None, 0, cache_cross, noi_cache=False)[0],
         )
 
         # 3. feed forward

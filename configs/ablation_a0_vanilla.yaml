@@ -1,0 +1,59 @@
+# =============================================================================
+# A0 — Transformer 2017 NGUYÊN BẢN  vs  phiên bản cải tiến   (thầy đề nghị)
+#
+# "Vì đã thêm các cải tiến so với Transformer 2017, anh đề nghị làm ablation
+#  vanilla Transformer vs phiên bản cải tiến với cùng budget train. Như vậy
+#  project sẽ chuyển từ 'code lại Transformer' thành một thực nghiệm đo được
+#  đóng góp của các cải tiến."
+#
+# ĐÂY LÀ THÍ NGHIỆM CHỦ ĐẠO CỦA CẢ ĐỒ ÁN. Nó trả lời câu hỏi mà mọi thí nghiệm
+# còn lại chỉ chạm tới một phần: gộp lại thì các cải tiến có đáng không, khi cả
+# hai bên tiêu đúng một ngân sách bước như nhau.
+#
+# KHÁC MỌI FILE ABLATION KHÁC Ở MỘT ĐIỂM QUAN TRỌNG.
+# A1 tới A6 mỗi file đổi ĐÚNG MỘT yếu tố, để quy công lao cho từng thành phần.
+# File này đổi CẢ GÓI cùng lúc — có chủ đích, không phải cẩu thả. Hai kiểu thí
+# nghiệm trả lời hai câu hỏi khác nhau và bổ sung cho nhau:
+#     A1..A6 : "thành phần nào đóng góp bao nhiêu"
+#     A0     : "cả gói có đáng không"
+# Trong báo cáo phải ghi rõ điều này, nếu không người đọc sẽ tưởng A0 vi phạm
+# nguyên tắc mỗi lần chỉ đổi một biến.
+#
+# Đối chứng: base.yaml (bản cải tiến), CÙNG số bước, CÙNG seed, CÙNG dữ liệu.
+# =============================================================================
+ke_thua: base.yaml
+
+thi_nghiem:
+  ten: a0_vanilla_2017
+
+mo_hinh:
+  # --- Bốn khối kiến trúc, trả hết về bản 2017 ---
+  kieu_chuan_hoa: layernorm     # 2017 dùng LayerNorm   (cải tiến: RMSNorm)
+  vi_tri_chuan_hoa: post        # 2017 dùng Post-Norm   (cải tiến: Pre-Norm)
+  ma_hoa_vi_tri: sinusoidal     # 2017 dùng sin-cos     (cải tiến: RoPE)
+  kieu_ffn: relu                # 2017 dùng ReLU        (cải tiến: SwiGLU)
+
+  # Post-Norm KHÔNG có lớp chuẩn hóa cuối. Đây không phải tùy chọn thẩm mỹ:
+  # ở Post-Norm, mỗi khối con đã kết thúc bằng một lớp chuẩn hóa rồi, nên chuẩn
+  # hóa thêm lần nữa ở cuối là thừa và làm lệch khỏi kiến trúc gốc.
+  co_chuan_hoa_cuoi: false
+
+  # ReLU dùng 2 ma trận còn SwiGLU dùng 3, nên phải nâng d_ff thì TỔNG SỐ THAM SỐ
+  # hai bên mới ngang nhau. Giữ nguyên 688 là vanilla bị thiệt 33% tham số ở khối
+  # FFN, và mọi chênh lệch đo được sẽ là chênh lệch về KÍCH THƯỚC chứ không phải
+  # về kiến trúc — thí nghiệm mất sạch ý nghĩa.
+  #     SwiGLU: 3 x 512 x 688  = 1.056.768
+  #     ReLU:   2 x 512 x 1024 = 1.048.576   -> chênh 0,8%, chấp nhận được
+  d_ff: 1024
+
+toi_uu:
+  # 2017 dùng warmup 4000 bước và label smoothing 0,1. Chúng thuộc CÔNG THỨC
+  # HUẤN LUYỆN của bài báo gốc chứ không phải kiến trúc, nên phải bật ở đây thì
+  # A0 mới thật sự là "bản 2017", không phải "bản 2017 nhưng huấn luyện kiểu mới".
+  #
+  # Hệ quả cần nói thẳng trong báo cáo: A0 vì thế KHÔNG tách bạch được đóng góp
+  # của kiến trúc với đóng góp của công thức huấn luyện. Phần tách bạch đó là
+  # việc của A2 và A3. Ba thí nghiệm phải đọc cùng nhau.
+  scheduler: warmup
+  so_buoc_warmup: 4000
+  label_smoothing: 0.1
