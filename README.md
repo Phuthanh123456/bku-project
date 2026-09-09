@@ -180,13 +180,18 @@ english-vietnamese-nmt-scratch-transformer-pytorch/
 │   └── serve/          # ui.py (Streamlit)
 ├── tests/              # 12 bài kiểm tra kiến trúc + checkpoint + beam + tái lập
 ├── scripts/            # prepare_data, train_tokenizer, overfit_sanity, benchmark_*, train, evaluate, export_model
-├── notebooks/          # 00 kiểm tra dữ liệu, 01 giải thích kiến trúc, 02 kaggle train
+├── notebooks/          # 00–02 pipeline gốc, 03 Kaggle mẫu chạy một lượt ablation
 ├── docker/             # Dockerfile (PyTorch bản CPU, multi-stage)
 ├── docs/               # báo cáo từng phần + hướng dẫn chạy
 ├── results/            # bảng số, hình vẽ do script sinh ra (không commit file nặng)
 ├── data/               # dữ liệu thô + đã xử lý (KHÔNG commit)
 └── artifacts/          # tokenizer, checkpoint (KHÔNG commit)
 ```
+
+Notebook giao cho người phụ chạy từng lượt ablation:
+[`notebooks/03_kaggle_ablation_mau.ipynb`](notebooks/03_kaggle_ablation_mau.ipynb).
+Hướng dẫn từng bước và bảng 15 lượt còn thiếu:
+[`docs/huong_dan_ablation_kaggle.md`](docs/huong_dan_ablation_kaggle.md).
 
 ---
 
