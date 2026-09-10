@@ -324,10 +324,32 @@ def main() -> None:
         # giá 3 lần, còn smoke 60 bước không đánh giá lần nào — không sinh ra
         # tot_nhat.pt, nên không có loss_dev, không chấm được BLEU, và bảng kết
         # quả toàn NaN. Chia làm 6 mốc để còn thấy được đường loss.
+        # LƯỢT CHẠY LẠI PHẢI BẮT ĐẦU TỪ SỐ 0, KHÔNG ĐƯỢC --tiep-tuc.
+        #
+        # Đã dính đúng lỗi này ngày 10/09. --chay-lai a0 xoá hàng khỏi ket_qua.csv
+        # nhưng CHECKPOINT CŨ vẫn nằm nguyên ở bước 3.000. Cờ --tiep-tuc truyền vô
+        # điều kiện nên train.py nạp checkpoint đó vào, thấy đã đủ ngân sách, rồi
+        # thoát sau ĐÚNG 0 BƯỚC. Báo cáo ghi "số bước đã chạy: 0 · thời gian chạy:
+        # 0.2 phút", bảng kết quả toàn NaN, và cấu hình warmup 120 vừa sửa chưa
+        # từng được dùng tới. Không có gì báo lỗi, chỉ có một lượt trống rỗng.
+        #
+        # Xoá hàng trong bảng mà không xoá checkpoint là mới dọn một nửa. Chỗ ghi
+        # nhớ "đã chạy tới đâu" nằm ở HAI nơi, phải dọn cả hai.
+        chay_lai_luot = bool(args.chay_lai) and ma in args.chay_lai
+
         lenh = [sys.executable, "scripts/train.py", "--config", duong_dan_cfg,
-                "--seed", str(seed), "--so-buoc", str(so_buoc), "--tiep-tuc",
+                "--seed", str(seed), "--so-buoc", str(so_buoc),
                 "--ten-thi-nghiem", f"abl{so_buoc}_{ten_goc}",
                 "--danh-gia-moi", str(max(10, so_buoc // 6))]
+        if not chay_lai_luot:
+            lenh.append("--tiep-tuc")
+        else:
+            thu_muc_ck = GOC / "artifacts" / "checkpoints" / ten_chay
+            da_xoa = thu_muc_ck.exists()
+            shutil.rmtree(thu_muc_ck, ignore_errors=True)
+            print(f"[ablation] CHẠY LẠI {ten_chay}: bỏ cờ --tiep-tuc để bắt đầu "
+                  f"từ bước 0" + (", đã xoá checkpoint cục bộ." if da_xoa else "."),
+                  flush=True)
         if args.smoke:
             lenh.append("--smoke")
 
@@ -387,6 +409,20 @@ def main() -> None:
             print(f"[ablation] Không thấy {ck} — lượt này không có checkpoint tốt nhất.",
                   flush=True)
             hong.append(f"{ma}/seed{seed} (thiếu checkpoint)")
+
+        # LƯỢT TRỐNG RỖNG PHẢI KÊU LÊN, ĐỪNG GHI NaN RỒI IM.
+        # Lượt A0 ngày 10/09 chạy đúng 0 bước trong 0,2 phút rồi ghi một hàng toàn
+        # NaN vào bảng. Nhìn bảng thì thấy có đủ 6 hàng, tưởng xong hết; phải soi
+        # cột giây_huấn_luyện (101,9 giây so với 4.541 giây của đối chứng) mới
+        # phát hiện. Kiểm ngay tại đây, ngay sau khi lượt kết thúc.
+        # pd.isna chứ không phải math.isnan: nó bắt được CẢ None lẫn NaN trong một
+        # lần gọi, mà pandas thì đã import sẵn ở đầu file.
+        if pd.isna(hang.get("loss_dev")):
+            hong.append(f"{ma}/seed{seed} (không có loss_dev — lượt chạy rỗng?)")
+            print(f"[ablation] CẢNH BÁO: {ten_chay} không có loss_dev. Lượt này "
+                  f"gần như chắc chắn đã thoát mà chưa huấn luyện bước nào — "
+                  f"kiểm results/bao_cao/{ten_chay}.md xem 'số bước đã chạy'.",
+                  flush=True)
 
         ghi_ket_qua(hang)
         da_chay += 1
