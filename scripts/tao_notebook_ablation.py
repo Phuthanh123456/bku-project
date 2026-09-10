@@ -203,10 +203,6 @@ REPO_HUB = "mgbao/envi-nmt-scratch-transformer"    # ĐỔI THÀNH TÀI KHOẢN 
 # đổi ở đây là hai notebook giẫm lên nhau.
 NHOM = "__NHOM__"
 
-# Chỉ chạy vài mã thôi. Để rỗng = chạy cả nhóm.
-#   ví dụ: CHI_THI_NGHIEM = ["a0"]
-CHI_THI_NGHIEM = []
-
 # XOÁ số cũ của những mã này rồi chạy lại từ đầu. Để rỗng = không xoá gì.
 #
 # Cần khi một lượt ĐÃ chạy xong nhưng số đo được KHÔNG DÙNG ĐƯỢC. Không có cờ
@@ -232,7 +228,11 @@ NGAN_SACH_BUOC = 3000
 # thời gian đẩy kết quả lên Hub và thoát sạch.
 GIO_TOI_DA = 9.0
 
-# Chạy lại chỉ vài thí nghiệm: ["doi_chung", "a0"]. None = chạy hết.
+# Chỉ chạy vài thí nghiệm: ["doi_chung", "a0"]. None = chạy cả nhóm.
+# Để chạy lại RIÊNG A0 sau khi đã sửa warmup, đặt cùng lúc hai dòng:
+#     CHI_THI_NGHIEM = ["a0"]
+#     CHAY_LAI       = ["a0"]
+# Thiếu CHAY_LAI thì vòng lặp thấy bảng đã có hàng a0 và bỏ qua, không chạy gì.
 CHI_THI_NGHIEM = None
 
 # ====================================================
@@ -412,8 +412,6 @@ lenh = (f"python scripts/chay_ablation.py --so-buoc {NGAN_SACH_BUOC} "
         f"--repo-hub {REPO_HUB} --gio-toi-da {GIO_TOI_DA} --nhom {NHOM}")
 if SMOKE_TEST:
     lenh += " --smoke"
-if CHI_THI_NGHIEM:
-    lenh += " --chi-thi-nghiem " + " ".join(CHI_THI_NGHIEM)
 if CHAY_LAI:
     lenh += " --chay-lai " + " ".join(CHAY_LAI)
 if CHI_THI_NGHIEM:
@@ -527,6 +525,35 @@ def main() -> None:
                    if k in duong_dan.read_text(encoding="utf-8")]
         if con_sot:
             raise SystemExit(f"Còn chỗ trống chưa điền trong {duong_dan.name}: {con_sot}")
+
+        # KHÔNG ĐƯỢC gán cùng một biến cấu hình hai lần trong một cell.
+        # Đã dính đúng lỗi này: CHI_THI_NGHIEM được khai báo hai lần trong Cell 2,
+        # cái dưới đè cái trên. Người dùng sửa dòng trên rồi bấm Run All, notebook
+        # im lặng chạy theo giá trị của dòng dưới. Không lỗi, không cảnh báo, chỉ
+        # có mấy giờ GPU chạy sai thứ. Kiểm ở đây vì cell chỉ là chuỗi chữ nên
+        # Python không bao giờ than phiền về chuyện gán trùng.
+        for so_cell, c in enumerate(cells):
+            if c["cell_type"] != "code":
+                continue
+            dem: dict[str, int] = {}
+            for dong in "".join(c["source"]).split("\n"):
+                # Chỉ xét gán ở CẤP NGOÀI CÙNG. Gán bên trong hàm hay nhánh if
+                # là chuyện bình thường và không phải chỗ người dùng sửa; tính
+                # cả chúng vào thì cửa chặn kêu oan và sẽ bị gỡ bỏ.
+                if dong[:1].isspace() or "=" not in dong:
+                    continue
+                s = dong.strip()
+                if s.startswith("#"):
+                    continue
+                ten = s.split("=")[0].strip()
+                if ten.isupper() and ten.isidentifier():
+                    dem[ten] = dem.get(ten, 0) + 1
+            trung = sorted(t for t, n in dem.items() if n > 1)
+            if trung:
+                raise SystemExit(
+                    f"{duong_dan.name} cell {so_cell}: biến cấu hình bị gán "
+                    f"nhiều lần: {trung}. Cái dưới sẽ đè cái trên và người dùng "
+                    f"sẽ sửa nhầm dòng.")
 
         so_code = sum(1 for c in cells if c["cell_type"] == "code")
         print(f"Đã sinh {duong_dan.relative_to(GOC)}")
