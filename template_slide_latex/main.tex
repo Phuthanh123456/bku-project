@@ -529,58 +529,6 @@
   \end{columns}
 \end{frame}
 
-% ------------------------------------------------------------
-%  SLIDE 10 – Kiến trúc (3/3)
-% ------------------------------------------------------------
-\begin{frame}[shrink=10]{Kiến trúc (3/3) — Những chỗ sai mà chương trình không báo lỗi}
-  \begin{columns}[T]
-    \begin{column}{0.47\textwidth}
-      \begin{block}{Ba điểm thiết kế bắt buộc nhớ}
-        \begin{enumerate}
-          \setlength{\itemsep}{0.25em}
-          \item \textbf{RoPE chỉ áp cho self-attention.} Ở cross-attention, query nằm ở
-            câu Việt còn key nằm ở câu Anh — hai chuỗi khác nhau nên "khoảng cách"
-            giữa chúng vô nghĩa.
-          \item \textbf{Pre-Norm là} $x + \mathrm{SubLayer}(\mathrm{Norm}(x))$,
-            \textbf{không phải} $\mathrm{Norm}(x + \mathrm{SubLayer}(x))$.
-          \item \textbf{Phải có một RMSNorm cuối} trước lớp Linear xuất từ vựng. Đường
-            residual không bao giờ được chuẩn hóa nên giá trị phình dần; quên bước này
-            không báo lỗi, chỉ làm mô hình mất ổn định.
-        \end{enumerate}
-      \end{block}
-    \end{column}
-    \begin{column}{0.48\textwidth}
-      \begin{block}{Bốn cái bẫy fp16 trên GPU T4}
-        \scriptsize\bangchat
-        \begin{tabular}{@{}p{1.9cm}p{1.7cm}p{2.2cm}@{}}
-          \toprule
-          \textbf{Chỗ} & \textbf{Phải làm} & \textbf{Nếu sai} \\
-          \midrule
-          Che mask trong attention &
-          \texttt{finfo(dtype)} \texttt{.min} &
-          \texttt{-1e9} thành $-\infty$, hàng bị mask ra \textbf{NaN} \\
-          \addlinespace
-          Bảng góc quay RoPE &
-          tính ở float32 rồi ép kiểu &
-          mất độ phân giải, \textbf{RoPE hỏng âm thầm} \\
-          \addlinespace
-          Bình phương trong RMSNorm &
-          tính ở float32 &
-          vượt 65504 $\rightarrow$ tràn $\rightarrow$ NaN cả mô hình \\
-          \addlinespace
-          GradScaler + cắt gradient &
-          \texttt{unscale\_()} trước khi clip &
-          clip gradient đã bị giãn, ngưỡng $1{,}0$ vô nghĩa \\
-          \bottomrule
-        \end{tabular}
-      \end{block}
-      \begin{beamercolorbox}[wd=\textwidth, rounded=true, sep=5pt]{block body alerted}
-        {\color{MLIOTink}\scriptsize T4 là kiến trúc Turing (CC 7.5),
-        \textbf{không có bf16}. Chốt cứng \texttt{fp16} trong YAML.}
-      \end{beamercolorbox}
-    \end{column}
-  \end{columns}
-\end{frame}
 
 % ------------------------------------------------------------
 %  SLIDE 11 – Kiểm chứng tính đúng đắn
@@ -630,64 +578,6 @@
   \end{columns}
 \end{frame}
 
-% ------------------------------------------------------------
-%  SLIDE 12 – Chốt cấu hình bằng số đo
-% ------------------------------------------------------------
-\begin{frame}[shrink=15]{Chốt cấu hình bằng số đo, không lấy từ bài báo}
-  \begin{columns}[T]
-    \begin{column}{0.56\textwidth}
-      \begin{block}{Khảo sát trên Tesla T4 — fp16, 30 bước mỗi cấu hình}
-        \scriptsize\bangchat
-        \begin{tabular}{@{}rrrrrrr@{}}
-          \toprule
-          \textbf{Lớp} & \textbf{Head} & \texttt{d\_ff} & \textbf{Drop} &
-          \textbf{Tham số} & \textbf{Giây/bước} & \textbf{VRAM} \\
-          \midrule
-          4 & 4 & 688  & 0{,}3 & 37.432.320 & 0{,}2728 & 6.959 \\
-          4 & 8 & 688  & 0{,}3 & 37.432.320 & 0{,}2839 & 7.025 \\
-          6 & 4 & 688  & 0{,}3 & 47.955.968 & 0{,}3572 & 8.016 \\
-          \textbf{6} & \textbf{8} & \textbf{688} & \textbf{0{,}3} &
-          \textbf{47.955.968} & \textbf{0{,}3710} & \textbf{8.112} \\
-          6 & 8 & 512  & 0{,}3 & 44.711.936 & 0{,}3655 & 7.924 \\
-          6 & 8 & 1024 & 0{,}3 & 54.149.120 & 0{,}3951 & 8.435 \\
-          6 & 8 & 688  & 0{,}1 & 47.955.968 & 0{,}3812 & 8.112 \\
-          6 & 8 & 688  & 0{,}5 & 47.955.968 & 0{,}3765 & 8.112 \\
-          \bottomrule
-        \end{tabular}
-      \end{block}
-      \begin{block}{Ngân sách theo số token mỗi batch}
-        \scriptsize\bangchat
-        \begin{tabular}{@{}rrrrc@{}}
-          \toprule
-          \textbf{Token/batch} & \textbf{Giây/bước} & \textbf{Bước/epoch} &
-          \textbf{Tổng giờ GPU} & \textbf{Khả thi} \\
-          \midrule
-          2048 & 0{,}8019 & 351 & 13{,}37 & CÓ \\
-          \textbf{4096} & \textbf{1{,}5000} & \textbf{177} & \textbf{25{,}00} &
-          \textbf{CÓ} \\
-          8192 & --- & --- & --- & tràn bộ nhớ \\
-          \bottomrule
-        \end{tabular}
-      \end{block}
-    \end{column}
-    \begin{column}{0.41\textwidth}
-      \begin{block}{Kết luận rút ra từ bảng}
-        \begin{itemize}
-          \setlength{\itemsep}{0.2em}
-          \item Chọn \textbf{6 lớp, 8 head, \texttt{d\_ff} 688, 4096 token/batch}
-          \item 339 epoch tốn khoảng \textbf{25{,}00 giờ GPU}; ngân sách nhóm 30
-            giờ/tuần $\rightarrow$ \textbf{khả thi}
-          \item Mức 8192 token/batch \textbf{tràn bộ nhớ} T4, loại ngay
-        \end{itemize}
-      \end{block}
-      \begin{beamercolorbox}[wd=\textwidth, rounded=true, sep=6pt]{block body alerted}
-        {\color{MLIOTink}\footnotesize\textbf{Nhanh nhất không đồng nghĩa với tốt
-        nhất.} Cấu hình 4 lớp / 4 head nhanh hơn nhưng sức biểu diễn kém hơn. Con số
-        cuối cùng phải chốt cùng với BLEU chứ không chỉ nhìn mỗi tốc độ.}
-      \end{beamercolorbox}
-    \end{column}
-  \end{columns}
-\end{frame}
 
 % ------------------------------------------------------------
 %  SLIDE 13 – Huấn luyện theo epoch
@@ -864,8 +754,9 @@
           \item Loss train $0{,}998$ so với loss dev $2{,}387$ $\rightarrow$ mô hình đã
             \textbf{bắt đầu quá khớp}, đúng như dự đoán với 131k câu.
           \item \textbf{Dừng sớm} đã kích hoạt — cơ chế chống quá khớp làm đúng việc.
-          \item Hướng xử lý là tăng dropout hoặc bật label smoothing, chính là thí
-            nghiệm \textbf{A3}.
+          \item Đáng chú ý: lượt ablation \textbf{3.000 bước} lại đạt loss dev
+            \textbf{2{,}277} — \textit{tốt hơn} lượt 17.000 bước này. Chạy dài hơn
+            5{,}7 lần mà tệ hơn, đúng vì quá khớp.
         \end{itemize}
       \end{block}
     \end{column}
@@ -975,9 +866,6 @@
           \setlength{\itemsep}{0.2em}
           \item A0 vanilla 2017 — đang chạy lại (lượt đầu đặt warmup 4.000 trong
             khi ngân sách chỉ 3.000 bước nên learning rate chưa từng lên tới đỉnh)
-          \item Phân tích lỗi trên các câu dịch tệ — \chuaxong{}
-          \item Chấm trên tst2015 để so trực tiếp với công bố IWSLT 2015 —
-            \chuaxong{}
         \end{itemize}
       \end{block}
       \begin{beamercolorbox}[wd=\textwidth, rounded=true, sep=7pt]{block body alerted}
@@ -985,7 +873,7 @@
         {\color{MLIOTink}\footnotesize
         \begin{itemize}
           \setlength{\itemsep}{0.1em}
-          \item Chạy đủ ablation 2 seed để trả lời dứt điểm RMSNorm vs LayerNorm
+          \item Chấm trên tst2015 để so trực tiếp với công bố IWSLT 2015
           \item Chống quá khớp mạnh hơn: label smoothing, dropout, back-translation
           \item Mở rộng sang PhoMT khi có ngân sách GPU lớn hơn
           \item Đóng gói Docker + Hugging Face Spaces và đo độ trễ đầu cuối
@@ -996,12 +884,14 @@
 \end{frame}
 
 % ------------------------------------------------------------
-%  SLIDE 19 – References (1/2)
+%  SLIDE 19 - Tai lieu tham khao (da gop 2 trang thanh 1)
 % ------------------------------------------------------------
-\begin{frame}[shrink=10]{Tài liệu tham khảo (1/2)}
-  \begin{thebibliography}{99}
-    \setbeamertemplate{bibliography item}[text]
-    \scriptsize
+\begin{frame}[shrink=25]{Tài liệu tham khảo}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{thebibliography}{99}
+        \setbeamertemplate{bibliography item}[text]
+        \scriptsize
 
     \bibitem[1]{vaswani2017}
     Vaswani, A., Shazeer, N., Parmar, N., \textit{et al.} (2017).
@@ -1038,16 +928,12 @@
     ACL 2016, pp.\,1715--1725.
     arXiv: \href{https://arxiv.org/abs/1508.07909}{1508.07909}
 
-  \end{thebibliography}
-\end{frame}
-
-% ------------------------------------------------------------
-%  SLIDE 20 – References (2/2)
-% ------------------------------------------------------------
-\begin{frame}[shrink=10]{Tài liệu tham khảo (2/2)}
-  \begin{thebibliography}{99}
-    \setbeamertemplate{bibliography item}[text]
-    \scriptsize
+      \end{thebibliography}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{thebibliography}{99}
+        \setbeamertemplate{bibliography item}[text]
+        \scriptsize
 
     \bibitem[7]{micikevicius2018}
     Micikevicius, P., Narang, S., Alben, J., \textit{et al.} (2018).
@@ -1083,7 +969,9 @@
     \textit{Stanford Neural Machine Translation Systems for Spoken Language Domains.}
     IWSLT 2015.
 
-  \end{thebibliography}
+      \end{thebibliography}
+    \end{column}
+  \end{columns}
 
   \vspace{0.2em}
   {\scriptsize\textit{Mã nguồn và trọng số:}
