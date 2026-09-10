@@ -55,5 +55,22 @@ toi_uu:
   # của kiến trúc với đóng góp của công thức huấn luyện. Phần tách bạch đó là
   # việc của A2 và A3. Ba thí nghiệm phải đọc cùng nhau.
   scheduler: warmup
-  so_buoc_warmup: 4000
+  #
+  # 120 CHỨ KHÔNG PHẢI 4000. Đây là chỗ đã làm hỏng lượt chạy đầu tiên.
+  #
+  # Lượt 10/09 đặt thẳng 4000 y như bài báo, trong khi ngân sách ablation chỉ có
+  # 3.000 bước. Hệ quả: A0 CHƯA BAO GIỜ CHẠY HẾT WARMUP. Suốt cả lượt learning
+  # rate vẫn đang tăng dần, tới lúc dừng mới đạt 75% đỉnh, trung bình cả lượt chỉ
+  # khoảng 37% đỉnh. Kết quả đo được là loss_dev 4,77 và BLEU test 3,6 — so với
+  # 2,28 và 28,7 của đối chứng. Nhìn thì tưởng "công thức 2017 kém hơn 25 BLEU",
+  # thật ra là "A0 chưa từng được học ở learning rate thật".
+  #
+  # 4000 của bài báo là cho lượt chạy 100.000 bước, tức 4% ngân sách. Giữ đúng
+  # TỈ LỆ đó ở ngân sách 3.000 bước thì ra 120. Như vậy A0 vẫn là công thức 2017
+  # (vẫn warmup, vẫn label smoothing), chỉ là warmup được quy đổi cho vừa ngân
+  # sách — và phải ghi rõ chuyện quy đổi này trong báo cáo.
+  #
+  # scripts/chay_ablation.py có cửa chặn từ chối chạy khi warmup >= ngân sách
+  # bước, nên lỗi này không thể lặp lại mà không ai hay.
+  so_buoc_warmup: 120
   label_smoothing: 0.1

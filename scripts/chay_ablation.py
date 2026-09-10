@@ -176,6 +176,13 @@ def main() -> None:
                              "mất đi là thứ ít đau nhất.")
     parser.add_argument("--chi-thi-nghiem", nargs="*", default=None,
                         help="chỉ chạy vài mã, ví dụ: --chi-thi-nghiem doi_chung a0")
+    parser.add_argument("--chay-lai", nargs="*", default=None,
+                        help="XOÁ hàng cũ của những mã này khỏi ket_qua.csv rồi "
+                             "chạy lại từ đầu. Cần khi một lượt đã chạy xong "
+                             "nhưng số ĐO ĐƯỢC KHÔNG DÙNG ĐƯỢC — ví dụ A0 lượt "
+                             "10/09 đặt warmup 4000 trong khi ngân sách chỉ 3.000 "
+                             "bước. Không có cờ này thì vòng lặp thấy đã có hàng "
+                             "và bỏ qua, nên số hỏng nằm lại vĩnh viễn.")
     parser.add_argument("--bo-qua-danh-gia", action="store_true",
                         help="chỉ huấn luyện, không chấm BLEU (để chấm sau)")
     args = parser.parse_args()
@@ -212,11 +219,56 @@ def main() -> None:
         except Exception as loi:
             print(f"[ablation] Không kéo được bảng cũ: {type(loi).__name__}: {loi}")
 
+    # XOÁ HÀNG CŨ CỦA NHỮNG MÃ CHẠY LẠI, trước khi lập kế hoạch.
+    # Làm sau khi kéo bảng từ Hub về, nếu không thì bảng vừa kéo về lại mang số
+    # hỏng quay lại và lượt chạy lại bị bỏ qua y như cũ.
+    if args.chay_lai and DUONG_DAN_KET_QUA.exists():
+        bang = pd.read_csv(DUONG_DAN_KET_QUA)
+        bo = bang[bang.ma_thi_nghiem.isin(args.chay_lai)]
+        if len(bo):
+            print(f"[ablation] Xoá {len(bo)} hàng cũ của {args.chay_lai} khỏi bảng "
+                  f"kết quả để chạy lại:")
+            for _, h in bo.iterrows():
+                print(f"    {h.ten_chay} · seed {h.seed} · "
+                      f"loss_dev {h.loss_dev:.4f} · BLEU test {h.bleu_test:.2f}")
+            bang[~bang.ma_thi_nghiem.isin(args.chay_lai)].to_csv(
+                DUONG_DAN_KET_QUA, index=False)
+        else:
+            print(f"[ablation] Bảng chưa có hàng nào của {args.chay_lai} — "
+                  f"không cần xoá gì.")
+
     ke_hoach = [(ma, cfg, seed)
                 for ma, cfg, seeds, nhom in THI_NGHIEM
                 for seed in seeds
                 if (args.nhom in ("tat_ca", nhom))
                 and (args.chi_thi_nghiem is None or ma in args.chi_thi_nghiem)]
+
+    # CỬA CHẶN: warmup không được dài hơn ngân sách bước.
+    # Lượt A0 ngày 10/09 đặt warmup 4000 trong khi ngân sách 3.000 bước, nên
+    # learning rate chưa bao giờ lên tới đỉnh — cả lượt trung bình chỉ ~37% đỉnh.
+    # Kết quả ra loss_dev 4,77 và BLEU 3,6 so với 2,28 và 28,7 của đối chứng,
+    # nhìn cứ như "công thức 2017 kém hơn 25 BLEU". Không có gì báo lỗi, không có
+    # gì trong log gợi ý, và 2,5 giờ GPU đi thẳng vào một con số không dùng được.
+    # Chặn ở đây vì đây là chỗ DUY NHẤT biết cả cấu hình lẫn ngân sách bước.
+    from nmt.utils.config import nap_config
+
+    xau = []
+    for ma, duong_cfg, _ in ke_hoach:
+        c = nap_config(GOC / duong_cfg)
+        if getattr(c.toi_uu, "scheduler", None) != "warmup":
+            continue
+        w = c.toi_uu.so_buoc_warmup
+        if w >= so_buoc:
+            xau.append(f"  {ma} ({duong_cfg}): warmup {w:,} >= ngân sách {so_buoc:,}")
+    if xau:
+        raise SystemExit(
+            "\nDỪNG — warmup dài hơn ngân sách bước, lượt chạy sẽ vô nghĩa:\n"
+            + "\n".join(xau)
+            + "\n\nLearning rate sẽ không bao giờ lên tới đỉnh, nên điểm đo được\n"
+              "phản ánh chuyện thiếu warmup chứ không phản ánh thứ đang so sánh.\n"
+              "Bài báo 2017 dùng warmup 4.000 cho lượt 100.000 bước, tức 4%.\n"
+              f"Giữ đúng tỉ lệ đó ở ngân sách {so_buoc:,} bước thì warmup nên là "
+              f"{max(1, round(so_buoc * 0.04)):,}.\n")
 
     ten_nhom = {"chinh": "NHÓM CHÍNH (đối chứng · A0 vanilla · A1 LayerNorm)",
                 "phu": "NHÓM PHỤ (A4 · A5 · A6 · A2 · A3)",
