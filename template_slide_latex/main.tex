@@ -419,20 +419,28 @@
   \begin{columns}[T]
     \begin{column}{0.49\textwidth}
       \begin{block}{Luồng dữ liệu}
-        \scriptsize
-        \texttt{src\_ids} $(B, S)$ $\rightarrow$ Embedding chung \\
-        $\rightarrow$ \textbf{6 $\times$ EncoderLayer} \\
-        \hspace{1.2em}self-attention (\textbf{có RoPE}) \\
-        \hspace{1.2em}feed-forward SwiGLU \\
-        $\rightarrow$ bộ nhớ encoder $(B, S, 512)$ \\[0.4em]
-        \texttt{tgt\_ids} $(B, T)$ $\rightarrow$ Embedding chung \\
-        $\rightarrow$ \textbf{6 $\times$ DecoderLayer} \\
-        \hspace{1.2em}self-attention (\textbf{có RoPE}) \\
-        \hspace{1.2em}cross-attention (\textbf{KHÔNG RoPE}) \\
-        \hspace{1.2em}feed-forward SwiGLU \\
-        $\rightarrow$ \textbf{RMSNorm cuối} \\
-        $\rightarrow$ Linear chia sẻ trọng số \\
-        $\rightarrow$ logits $(B, T, 32000)$
+        \scriptsize\bangchat
+        \begin{tabular}{@{}ll@{}}
+          \toprule
+          \multicolumn{2}{@{}l}{\textbf{ENCODER} \quad vào: \texttt{src\_ids}
+            $(B, S)$} \\
+          \midrule
+          Embedding chung   & $(B, S, 512)$ \\
+          $6 \times$ lớp    & self-attention — \textbf{có RoPE} \\
+                            & feed-forward SwiGLU \\
+          \textit{ra}       & bộ nhớ $(B, S, 512)$ \\
+          \midrule
+          \multicolumn{2}{@{}l}{\textbf{DECODER} \quad vào: \texttt{tgt\_ids}
+            $(B, T)$} \\
+          \midrule
+          Embedding chung   & $(B, T, 512)$ \\
+          $6 \times$ lớp    & self-attention — \textbf{có RoPE} \\
+                            & cross-attention — \textbf{KHÔNG RoPE} \\
+                            & feed-forward SwiGLU \\
+          RMSNorm cuối      & \\
+          Linear chia sẻ    & $(B, T, 32000)$ \\
+          \bottomrule
+        \end{tabular}
       \end{block}
     \end{column}
     \begin{column}{0.48\textwidth}
@@ -614,12 +622,9 @@
       chưa tới 500 bước.}}
       \vspace{0.4em}
       \begin{beamercolorbox}[wd=\textwidth, rounded=true, sep=6pt]{block body alerted}
-        {\color{MLIOTink}\footnotesize\textbf{Kết quả cổng chặn:} loss cuối
-        $< 0{,}05$ \xong{}, BLEU trên chính 50 câu đó \textbf{100{,}00} (yêu cầu
-        $> 90$) \xong{}.
-        \par\vspace{0.2em}
-        Mô hình \textbf{không} học thuộc nổi 50 câu là kiến trúc còn sai — chưa qua
-        bước này thì chưa được huấn luyện chính thức.}
+        {\color{MLIOTink}\scriptsize\textbf{Cổng chặn:} loss cuối $< 0{,}05$
+        \xong{}, BLEU trên chính 50 câu đó \textbf{100{,}00} \xong{}. Không học
+        thuộc nổi 50 câu là kiến trúc còn sai — chưa qua thì chưa được huấn luyện.}
       \end{beamercolorbox}
     \end{column}
   \end{columns}
@@ -690,21 +695,6 @@
 \begin{frame}[shrink=15]{Huấn luyện theo epoch — một chu kỳ cập nhật}
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
-      \begin{block}{Thứ tự đúng của một bước optimizer}
-        \scriptsize
-        \texttt{for i in range(so\_buoc\_cong\_don):} \\
-        \hspace{1em}\texttt{with autocast(float16):} \\
-        \hspace{2em}\texttt{loss = tinh\_loss(...) / so\_buoc\_cong\_don} \\
-        \hspace{1em}\texttt{scaler.scale(loss).backward()} \\
-        \texttt{scaler.unscale\_(optimizer)} \\
-        \texttt{clip\_grad\_norm\_(params, 1.0)} \\
-        \texttt{scaler.step(optimizer); scaler.update()} \\
-        \texttt{optimizer.zero\_grad(set\_to\_none=True)} \\
-        \texttt{scheduler.step()}
-        \par\vspace{0.3em}
-        \textbf{Không gọi} \texttt{model.half()} — sẽ ép bảng góc quay của RoPE xuống
-        fp16. Dùng \texttt{torch.autocast}.
-      \end{block}
       \begin{block}{Cấu hình tối ưu}
         \scriptsize\bangchat
         \begin{tabular}{@{}ll@{}}
@@ -787,19 +777,6 @@
         \texttt{configs/}\tk{ten\_chay}\texttt{.yaml} — cấu hình đã gộp \\
         \texttt{artifacts/tokenizer/tokenizer.json} — dùng chung mọi lượt \\
         \texttt{smoke/...} — smoke test, \textbf{không} phải kết quả thật
-      \end{block}
-      \begin{block}{Bảo mật và ba cái bẫy đã gặp thật}
-        \footnotesize
-        \begin{itemize}
-          \setlength{\itemsep}{0.15em}
-          \item Token đọc theo thứ tự \textbf{Kaggle Secrets $\rightarrow$ biến môi
-            trường \texttt{HF\_TOKEN} $\rightarrow$ báo lỗi rõ ràng}. Không viết token
-            vào code, không commit.
-          \item Smoke test \textbf{mặc định không đẩy} lên nhánh thật — lần trước một
-            lượt smoke đã đè mất checkpoint thật.
-          \item Luôn \textbf{liệt kê file trên repo} trước khi kết luận "Hub chưa có
-            gì" — lần trước kết luận nhầm rồi train lại 3 tiếng.
-        \end{itemize}
       \end{block}
     \end{column}
   \end{columns}
