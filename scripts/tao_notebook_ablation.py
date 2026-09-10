@@ -203,6 +203,21 @@ REPO_HUB = "mgbao/envi-nmt-scratch-transformer"    # ĐỔI THÀNH TÀI KHOẢN 
 # đổi ở đây là hai notebook giẫm lên nhau.
 NHOM = "__NHOM__"
 
+# Chỉ chạy vài mã thôi. Để rỗng = chạy cả nhóm.
+#   ví dụ: CHI_THI_NGHIEM = ["a0"]
+CHI_THI_NGHIEM = []
+
+# XOÁ số cũ của những mã này rồi chạy lại từ đầu. Để rỗng = không xoá gì.
+#
+# Cần khi một lượt ĐÃ chạy xong nhưng số đo được KHÔNG DÙNG ĐƯỢC. Không có cờ
+# này thì vòng lặp thấy bảng đã có hàng và bỏ qua, nên số hỏng nằm lại vĩnh viễn.
+#
+#   ví dụ: CHAY_LAI = ["a0"]
+# Lượt A0 ngày 10/09 rơi đúng ca này: warmup đặt 4000 trong khi ngân sách chỉ
+# 3.000 bước, nên learning rate chưa bao giờ lên tới đỉnh — ra BLEU 3,6 thay vì
+# ~28. Đã sửa warmup xuống 120 (đúng tỉ lệ 4% của bài báo), cần chạy lại A0.
+CHAY_LAI = []
+
 # NGÂN SÁCH BƯỚC — dùng chung cho MỌI thí nghiệm.
 # Đây là con số quan trọng nhất của cả notebook: ablation chỉ có nghĩa khi mọi
 # cấu hình tiêu đúng một ngân sách như nhau. Đổi số này thì phải chạy lại TẤT CẢ,
@@ -397,6 +412,10 @@ lenh = (f"python scripts/chay_ablation.py --so-buoc {NGAN_SACH_BUOC} "
         f"--repo-hub {REPO_HUB} --gio-toi-da {GIO_TOI_DA} --nhom {NHOM}")
 if SMOKE_TEST:
     lenh += " --smoke"
+if CHI_THI_NGHIEM:
+    lenh += " --chi-thi-nghiem " + " ".join(CHI_THI_NGHIEM)
+if CHAY_LAI:
+    lenh += " --chay-lai " + " ".join(CHAY_LAI)
 if CHI_THI_NGHIEM:
     lenh += " --chi-thi-nghiem " + " ".join(CHI_THI_NGHIEM)
 
