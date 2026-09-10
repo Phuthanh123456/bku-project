@@ -38,11 +38,14 @@
 %  Ký hiệu dùng lại nhiều lần trong bài
 % ============================================================
 % DeclareRobustCommand chứ KHÔNG phải newcommand.
-% Hai lệnh này được dùng trong tiêu đề block và ô bảng — đó là "đối số di động",
-% nội dung bị mang đi dựng lại ở chỗ khác. Lệnh mềm (\newcommand) đặt vào đó sẽ
-% bung ra sai lúc dựng trang, và lỗi báo ở tận dòng \end{frame} chứ không báo ở
-% dòng gây ra, nên rất khó truy. Đây chính là lỗi dòng 598 của slide 11:
+% Hai lệnh này được dùng trong TIÊU ĐỀ BLOCK và ô bảng — đó là "đối số di động",
+% nội dung bị mang đi dựng lại ở chỗ khác, ví dụ slide 11:
 %     \begin{block}{Mười hai bài kiểm tra — 12/12 \xong}
+% Lệnh mềm đặt vào đó có thể bung ra sai lúc dựng trang.
+%
+% Ghi cho rõ: đây KHÔNG phải nguyên nhân của lỗi "Runaway argument" ở slide 11.
+% Lỗi đó là do \par nằm trong đối số của \textcolor — xem chú thích dưới đây.
+% Đổi sang DeclareRobustCommand là phòng xa, không phải bản vá của lỗi ấy.
 \DeclareRobustCommand{\xong}{\textcolor{MLIOTnavy}{\textbf{ĐẠT}}}
 \DeclareRobustCommand{\chuaxong}{\textcolor{MLIOTcoral}{\textbf{chưa xong}}}
 
@@ -56,6 +59,25 @@
 
 % Bảng trên slide luôn chật, thu hẹp khoảng cách cột lại cho vừa.
 \newcommand{\bangchat}{\setlength{\tabcolsep}{3pt}}
+
+% ============================================================
+%  ĐỔI MÀU TRONG beamercolorbox: DÙNG {\color{X}...} CHỨ ĐỪNG \textcolor{X}{...}
+% ============================================================
+% \textcolor nhận đối số NGẮN — không cho phép ngắt đoạn. Đặt \par, dòng trắng,
+% hay \begin{itemize} (itemize tự sinh \par) vào bên trong là vỡ ngay:
+%
+%     Runaway argument?
+%     ! Paragraph ended before \@textcolor was complete.
+%
+% Và TeX báo lỗi ở dòng \end{frame} chứ không báo ở dòng gây ra, nên rất khó truy.
+% Một khối hỏng đẻ ra cả chục lỗi dây chuyền — bản trước có 68 lỗi chỉ vì ba khối.
+%
+% \color là lệnh KHAI BÁO, đổi màu từ đó tới hết nhóm ngoặc, nên ngắt đoạn và
+% itemize thoải mái. Số dấu ngoặc y hệt nên đổi qua lại không lệch:
+%
+%     \textcolor{MLIOTink}{...}   ->   {\color{MLIOTink}...}
+%
+% Cả 10 hộp trong file này đã đổi hết cho đồng nhất, không chỉ ba chỗ đang hỏng.
 
 % ============================================================
 %  PAPER METADATA – fill these in
@@ -178,7 +200,7 @@
         đối chiếu số học.
       \end{block}
       \begin{beamercolorbox}[wd=\textwidth, rounded=true, sep=6pt]{block body alerted}
-        \textcolor{MLIOTink}{\footnotesize\textbf{Nguyên tắc xuyên suốt:} mọi lựa chọn
+        {\color{MLIOTink}\footnotesize\textbf{Nguyên tắc xuyên suốt:} mọi lựa chọn
         kiến trúc phải chứng minh được bằng \textbf{số liệu thực nghiệm}, không lấy
         mặc định của bài báo làm kết luận.}
       \end{beamercolorbox}
@@ -225,7 +247,7 @@
         \end{tabular}
       \end{block}
       \begin{beamercolorbox}[wd=\textwidth, rounded=true, sep=6pt]{block body alerted}
-        \textcolor{MLIOTink}{\footnotesize Mức đánh giá BLEU trên tst2013:
+        {\color{MLIOTink}\footnotesize Mức đánh giá BLEU trên tst2013:
         $\ge 19$ tối thiểu chấp nhận · $\ge 22$ tốt · $\ge 29$ rất tốt.}
       \end{beamercolorbox}
     \end{column}
@@ -301,7 +323,7 @@
         Tập dev/test \textbf{không bị lọc}, chỉ chuẩn hóa NFC để giữ nguyên số câu.
       \end{block}
       \begin{beamercolorbox}[wd=\textwidth, rounded=true, sep=6pt]{block body alerted}
-        \textcolor{MLIOTink}{\footnotesize\textbf{Chống rò rỉ:} 12 cặp câu của tst2012
+        {\color{MLIOTink}\footnotesize\textbf{Chống rò rỉ:} 12 cặp câu của tst2012
         và 12 cặp của tst2013 trùng nguyên si trong train $\rightarrow$ xóa
         \textbf{24 cặp} khỏi \textit{train}, không đụng dev/test. Bỏ qua bước này là
         điểm BLEU bị đội lên giả tạo.}
@@ -491,7 +513,7 @@
         Nhờ vậy mỗi thí nghiệm ablation chỉ khác \textbf{đúng một yếu tố}.
       \end{block}
       \begin{beamercolorbox}[wd=\textwidth, rounded=true, sep=6pt]{block body alerted}
-        \textcolor{MLIOTink}{\footnotesize Warmup và Label Smoothing \textbf{mặc định
+        {\color{MLIOTink}\footnotesize Warmup và Label Smoothing \textbf{mặc định
         TẮT}. Giữ hay bỏ do \textbf{kết quả ablation} quyết định, không phải do bài
         báo quyết định.}
       \end{beamercolorbox}
@@ -545,7 +567,7 @@
         \end{tabular}
       \end{block}
       \begin{beamercolorbox}[wd=\textwidth, rounded=true, sep=5pt]{block body alerted}
-        \textcolor{MLIOTink}{\scriptsize T4 là kiến trúc Turing (CC 7.5),
+        {\color{MLIOTink}\scriptsize T4 là kiến trúc Turing (CC 7.5),
         \textbf{không có bf16}. Chốt cứng \texttt{fp16} trong YAML.}
       \end{beamercolorbox}
     \end{column}
@@ -592,7 +614,7 @@
       chưa tới 500 bước.}}
       \vspace{0.4em}
       \begin{beamercolorbox}[wd=\textwidth, rounded=true, sep=6pt]{block body alerted}
-        \textcolor{MLIOTink}{\footnotesize\textbf{Kết quả cổng chặn:} loss cuối
+        {\color{MLIOTink}\footnotesize\textbf{Kết quả cổng chặn:} loss cuối
         $< 0{,}05$ \xong{}, BLEU trên chính 50 câu đó \textbf{100{,}00} (yêu cầu
         $> 90$) \xong{}.
         \par\vspace{0.2em}
@@ -654,7 +676,7 @@
         \end{itemize}
       \end{block}
       \begin{beamercolorbox}[wd=\textwidth, rounded=true, sep=6pt]{block body alerted}
-        \textcolor{MLIOTink}{\footnotesize\textbf{Nhanh nhất không đồng nghĩa với tốt
+        {\color{MLIOTink}\footnotesize\textbf{Nhanh nhất không đồng nghĩa với tốt
         nhất.} Cấu hình 4 lớp / 4 head nhanh hơn nhưng sức biểu diễn kém hơn. Con số
         cuối cùng phải chốt cùng với BLEU chứ không chỉ nhìn mỗi tốc độ.}
       \end{beamercolorbox}
@@ -820,7 +842,7 @@
         ra} — chỉ nhìn đồ thị mới phát hiện được.
       \end{block}
       \begin{beamercolorbox}[wd=\textwidth, rounded=true, sep=6pt]{block body alerted}
-        \textcolor{MLIOTink}{\footnotesize Thời gian lưu và đẩy checkpoint chiếm
+        {\color{MLIOTink}\footnotesize Thời gian lưu và đẩy checkpoint chiếm
         \textbf{0{,}01\%} tổng thời gian huấn luyện (yêu cầu $< 5\%$) — \xong{}.}
       \end{beamercolorbox}
     \end{column}
@@ -928,7 +950,7 @@
         giữa hai seed.
       \end{block}
       \begin{beamercolorbox}[wd=\textwidth, rounded=true, sep=6pt]{block body alerted}
-        \textcolor{MLIOTink}{\footnotesize\textbf{A1 — trả lời câu mentor hỏi.}
+        {\color{MLIOTink}\footnotesize\textbf{A1 — trả lời câu mentor hỏi.}
         RMSNorm và LayerNorm chênh nhau \textbf{0{,}04 BLEU}, nhỏ hơn hẳn dao động
         giữa hai seed của chính từng nhóm ($0{,}18$ và $0{,}27$). Tức
         \textbf{chất lượng không phân biệt được}. Nhưng RMSNorm \textbf{nhanh hơn
@@ -983,7 +1005,7 @@
       \end{block}
       \begin{beamercolorbox}[wd=\textwidth, rounded=true, sep=7pt]{block body alerted}
         \textbf{\textcolor{MLIOTblue}{Hướng phát triển:}}
-        \textcolor{MLIOTink}{\footnotesize
+        {\color{MLIOTink}\footnotesize
         \begin{itemize}
           \setlength{\itemsep}{0.1em}
           \item Chạy đủ ablation 2 seed để trả lời dứt điểm RMSNorm vs LayerNorm
