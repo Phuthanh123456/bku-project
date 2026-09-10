@@ -34,6 +34,22 @@ def main() -> None:
     parser.add_argument("--cho-phep-smoke", action="store_true",
                         help="Cho phép chấm điểm trên checkpoint của smoke test. "
                              "Mặc định TỪ CHỐI, vì điểm đó không phải kết quả thật.")
+    parser.add_argument("--cach", choices=["greedy", "beam"], default="greedy",
+                        help="Cách sinh câu. Mặc định greedy — điểm baseline của "
+                             "TASK 16. Đổi sang beam là phần so sánh của TASK 19.")
+    parser.add_argument("--beam-size", type=int, default=None,
+                        help="ghi đè sinh_cau.beam_size")
+    parser.add_argument("--luu-vi-du", type=int, default=0,
+                        help="ghi N câu dịch ra results/vi_du_dich.csv để dựng "
+                             "bảng ví dụ trong báo cáo")
+    parser.add_argument("--gioi-han-cau", type=int, default=0,
+                        help="chỉ chấm N câu đầu. 0 = chấm đủ cả tập. "
+                             "Dùng cho smoke test: chấm đủ 1.553 câu dev cộng "
+                             "1.268 câu test cho MỖI lượt, nhân 14 lượt, thì "
+                             "phần chấm điểm lâu hơn cả phần huấn luyện — smoke "
+                             "test thành thứ chậm nhất quy trình, ngược hẳn mục "
+                             "đích của nó. ĐIỂM RA KHÔNG PHẢI KẾT QUẢ THẬT, chỉ "
+                             "để chứng minh đường chấm điểm chạy được.")
     args = parser.parse_args()
 
     cfg = nap_config(args.config)
@@ -47,7 +63,7 @@ def main() -> None:
     from datetime import datetime
     from nmt.data import nap_tokenizer, DuLieuSongNgu, tao_dataloader, PAD_ID, BOS_ID, EOS_ID
     from nmt.model.transformer import TransformerNMT
-    from nmt.inference.search import greedy_search
+    from nmt.inference.search import beam_search, greedy_search
     from nmt.eval.metrics import cham_bleu, cham_chrf
 
     tokenizer = nap_tokenizer(cfg.du_lieu.tokenizer)
@@ -57,7 +73,21 @@ def main() -> None:
     duong_dan_vi = f"{split_path}.vi"
     
     dataset = DuLieuSongNgu(duong_dan_en, duong_dan_vi, tokenizer)
-    loader = tao_dataloader(dataset, so_token_moi_batch=cfg.du_lieu.so_token_moi_batch, gom_theo_do_dai=False, tron=False)
+
+    if args.gioi_han_cau > 0:
+        dataset._src = dataset._src[: args.gioi_han_cau]
+        dataset._tgt = dataset._tgt[: args.gioi_han_cau]
+        print(f"CHỈ CHẤM {len(dataset)} CÂU ĐẦU — điểm dưới đây KHÔNG phải kết "
+              f"quả thật, chỉ để kiểm đường chấm điểm chạy được.")
+
+    # gom_theo_do_dai=True: xếp câu dài gần nhau nên mỗi batch bớt phần đệm.
+    # Sinh câu là vòng lặp tự hồi quy chạy tới khi câu DÀI NHẤT trong batch xong,
+    # nên một câu 100 token đứng chung với chín câu 10 token bắt cả batch chạy đủ
+    # 100 bước. Xếp theo độ dài cắt được phần lãng phí đó.
+    # KHÔNG ảnh hưởng tới điểm: câu dịch và câu tham chiếu lấy ra từ cùng một
+    # batch nên vẫn khớp cặp; sacrebleu chấm theo cặp chứ không theo thứ tự.
+    loader = tao_dataloader(dataset, so_token_moi_batch=cfg.du_lieu.so_token_moi_batch,
+                            gom_theo_do_dai=True, tron=False)
 
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -127,35 +157,96 @@ def main() -> None:
     
     du_doan = []
     tham_chieu = []
-    
-    print(f"Bắt đầu dịch tập {args.split} ({len(dataset)} câu)...")
+    cau_nguon = []          # để dựng bảng ví dụ trong báo cáo
+
+    beam_size = args.beam_size or cfg.sinh_cau.beam_size
+    mo_ta_cach = (f"beam={beam_size}, phạt độ dài {cfg.sinh_cau.he_so_phat_do_dai}"
+                  if args.cach == "beam" else "greedy")
+    print(f"Bắt đầu dịch tập {args.split} ({len(dataset)} câu) bằng {mo_ta_cach}...")
+
+    import time
+
+    bat_dau = time.perf_counter()
     with torch.no_grad():
         for i, batch in enumerate(loader):
             src_ids = batch["src_ids"].to(device)
             src_mask = batch["src_mask"].to(device)
             labels = batch["labels"].to(device)
-            
-            preds_ids = greedy_search(model, src_ids, src_mask, BOS_ID, EOS_ID, do_dai_toi_da=cfg.sinh_cau.do_dai_toi_da_khi_dich)
-            
-            for p_ids, l_ids in zip(preds_ids, labels):
+
+            if args.cach == "beam":
+                preds_ids = beam_search(
+                    model, src_ids, src_mask, BOS_ID, EOS_ID,
+                    beam_size=beam_size,
+                    he_so_phat_do_dai=cfg.sinh_cau.he_so_phat_do_dai,
+                    do_dai_toi_da=cfg.sinh_cau.do_dai_toi_da_khi_dich,
+                    dung_kv_cache=True,
+                )
+            else:
+                preds_ids = greedy_search(
+                    model, src_ids, src_mask, BOS_ID, EOS_ID,
+                    do_dai_toi_da=cfg.sinh_cau.do_dai_toi_da_khi_dich,
+                    dung_kv_cache=cfg.sinh_cau.dung_kv_cache,
+                )
+
+            for p_ids, l_ids, s_ids in zip(preds_ids, labels, src_ids):
                 p_list = p_ids.tolist()
                 if BOS_ID in p_list: p_list.remove(BOS_ID)
                 if EOS_ID in p_list: p_list = p_list[:p_list.index(EOS_ID)]
                 du_doan.append(tokenizer.decode(p_list, skip_special_tokens=True))
-                
+
                 l_list = l_ids.tolist()
                 if EOS_ID in l_list: l_list = l_list[:l_list.index(EOS_ID)]
                 tham_chieu.append(tokenizer.decode(l_list, skip_special_tokens=True))
 
+                cau_nguon.append(
+                    tokenizer.decode([t for t in s_ids.tolist() if t != PAD_ID],
+                                     skip_special_tokens=True))
+
             if (i + 1) % 10 == 0:
                 print(f" Đã dịch xong batch {i + 1}/{len(loader)}")
 
+    giay_dich = time.perf_counter() - bat_dau
+
     bleu, bleu_sig = cham_bleu(du_doan, tham_chieu)
     chrf, chrf_sig = cham_chrf(du_doan, tham_chieu)
-    
-    print(f"\nKẾT QUẢ TRÊN TẬP {args.split.upper()}:")
+
+    print(f"\nKẾT QUẢ TRÊN TẬP {args.split.upper()}  ({mo_ta_cach}):")
     print(f"BLEU:   {bleu:.2f}  (Chữ ký: {bleu_sig})")
     print(f"chrF++: {chrf:.2f}  (Chữ ký: {chrf_sig})")
+    print(f"Thời gian dịch: {giay_dich:.1f} giây "
+          f"({len(du_doan) / giay_dich:.1f} câu/giây)")
+
+    # ------------------------------------------------------- bảng câu ví dụ
+    # docs/bao_cao_danh_gia.md đòi bảng mười câu, và đòi CHỌN CẢ CÂU DỊCH TỐT
+    # LẪN CÂU DỊCH TỆ. Lấy mười câu đầu là chọn mẫu thiên vị: tập test thường xếp
+    # theo tài liệu nguồn nên mười câu đầu cùng một chủ đề và cùng độ khó.
+    # Ở đây xếp theo độ trùng khớp rồi lấy cả hai đầu, để bảng phản ánh thật.
+    os.makedirs("results", exist_ok=True)
+
+    if args.luu_vi_du > 0:
+        import sacrebleu
+
+        diem_tung_cau = [
+            sacrebleu.sentence_bleu(d, [t]).score for d, t in zip(du_doan, tham_chieu)
+        ]
+        thu_tu = sorted(range(len(du_doan)), key=lambda i: diem_tung_cau[i])
+        mot_nua = max(1, args.luu_vi_du // 2)
+        chon = thu_tu[:mot_nua] + thu_tu[-mot_nua:]      # tệ nhất + tốt nhất
+
+        pd.DataFrame([{
+            "stt": i,
+            "nhom": "dịch tệ" if vi_tri < mot_nua else "dịch tốt",
+            "cau_anh": cau_nguon[i],
+            "ban_dich_chuan": tham_chieu[i],
+            "du_doan": du_doan[i],
+            "bleu_cau": round(diem_tung_cau[i], 2),
+            "cach": args.cach,
+            "tap": args.split,
+        } for vi_tri, i in enumerate(chon)]).to_csv(
+            Path("results") / f"vi_du_dich_{args.split}_{args.cach}.csv",
+            index=False, encoding="utf-8")
+        print(f"Đã ghi {len(chon)} câu ví dụ (nửa tệ nhất, nửa tốt nhất) vào "
+              f"results/vi_du_dich_{args.split}_{args.cach}.csv")
     
     os.makedirs("results", exist_ok=True)
     csv_path = "results/diem_chinh.csv"
@@ -165,6 +256,10 @@ def main() -> None:
         "Tập test": args.split,
         "Hướng dịch": "En-Vi",
         "Số câu": len(dataset),
+        # Thiếu cột này thì dòng của Greedy và dòng của Beam nhìn y hệt nhau, và
+        # TASK 19 không chứng minh được beam hơn greedy bao nhiêu điểm.
+        "Cách sinh": mo_ta_cach,
+        "Giây dịch": round(giay_dich, 1),
         "BLEU": bleu,
         "chrF++": chrf,
         "Chữ ký BLEU": bleu_sig,

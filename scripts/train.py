@@ -289,11 +289,30 @@ def main() -> None:
                         help="ngân sách giờ cho lượt chạy này. Hết giờ thì tự lưu, "
                              "đẩy lên Hub rồi dừng, phiên sau --tiep-tuc là chạy tiếp. "
                              "Kaggle cắt phiên GPU ở khoảng 12 giờ nên nên đặt 10-11.")
+    parser.add_argument("--ten-thi-nghiem", default=None,
+                        help="ghi đè thi_nghiem.ten, tức đổi TÊN LƯỢT CHẠY. "
+                             "Ablation bắt buộc dùng cờ này để không trùng tên với "
+                             "lượt huấn luyện chính — trùng tên cộng với --tiep-tuc "
+                             "là nó kéo checkpoint của lượt chính về chạy tiếp rồi "
+                             "ghi đè lên, mà không báo lỗi gì.")
+    parser.add_argument("--danh-gia-moi", type=int, default=None,
+                        help="ghi đè huan_luyen.danh_gia_moi. Cần cho lượt chạy "
+                             "ngắn: mặc định 1000 bước mới đánh giá một lần, nên "
+                             "smoke 60 bước không đánh giá lần nào, không sinh ra "
+                             "tot_nhat.pt, và cả đường chấm BLEU không hề được kiểm.")
     args = parser.parse_args()
 
     cfg = nap_config(args.config)
     if args.seed is not None:
         cfg["thi_nghiem"]["seed"] = args.seed
+    if args.ten_thi_nghiem:
+        cfg["thi_nghiem"]["ten"] = args.ten_thi_nghiem
+    if args.danh_gia_moi:
+        cfg["huan_luyen"]["danh_gia_moi"] = args.danh_gia_moi
+        # Lưu checkpoint không được thưa hơn đánh giá, nếu không thì lượt ngắn
+        # tìm ra bản tốt nhất rồi mà chưa kịp lưu lần nào.
+        cfg["huan_luyen"]["luu_checkpoint_moi"] = min(
+            cfg.huan_luyen.luu_checkpoint_moi, args.danh_gia_moi)
     cfg["thi_nghiem"]["duong_dan_config"] = args.config
     dat_seed(cfg.thi_nghiem.seed, cfg.thi_nghiem.deterministic)
 

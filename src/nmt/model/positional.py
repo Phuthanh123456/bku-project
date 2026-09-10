@@ -106,12 +106,22 @@ class MaHoaViTriSinCos(nn.Module):
         pe[:, 1::2] = torch.cos(goc)
         self.register_buffer("pe", pe.unsqueeze(0), persistent=False)   # (1, L, d_model)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """x: (batch, seq_len, d_model) -> cùng kích thước."""
+    def forward(self, x: torch.Tensor, vi_tri_bat_dau: int = 0) -> torch.Tensor:
+        """x: (batch, seq_len, d_model) -> cùng kích thước.
+
+        vi_tri_bat_dau khác 0 khi sinh câu từng token có KV cache (TASK 19).
+        BẮT BUỘC phải có tham số này. Lúc dùng cache, mỗi bước chỉ đưa vào ĐÚNG
+        MỘT token nên seq_len = 1, và `self.pe[:, :1]` luôn là vector vị trí 0.
+        Nghĩa là mọi token sinh ra đều bị cộng vị trí 0: mô hình mất sạch thông
+        tin thứ tự và dịch ra chữ lộn xộn, mà KHÔNG có lỗi nào được ném ra.
+        RoPE không dính bẫy này vì nó vốn đã nhận vi_tri_bat_dau từ đầu.
+        """
         seq_len = x.shape[1]
-        if seq_len > self.pe.shape[1]:
+        vi_tri_cuoi = vi_tri_bat_dau + seq_len
+        if vi_tri_cuoi > self.pe.shape[1]:
             raise ValueError(
-                f"seq_len ({seq_len}) vượt do_dai_toi_da đã cache ({self.pe.shape[1]}) của positional encoding"
+                f"vị trí {vi_tri_cuoi} vượt do_dai_toi_da đã cache "
+                f"({self.pe.shape[1]}) của positional encoding"
             )
-        x = x + self.pe[:, :seq_len, :].to(dtype=x.dtype)
+        x = x + self.pe[:, vi_tri_bat_dau:vi_tri_cuoi, :].to(dtype=x.dtype)
         return self.dropout(x)

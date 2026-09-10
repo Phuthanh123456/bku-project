@@ -96,15 +96,41 @@ class MultiHeadAttention(nn.Module):
         mask: torch.Tensor | None = None,
         rope=None,                  # đối tượng RoPE, hoặc None cho cross-attention
         vi_tri_bat_dau: int = 0,    # khác 0 khi sinh câu có KV cache, TASK 19
+        cache: dict | None = None,  # TASK 19 — kho chứa k, v của các bước trước
+        noi_cache: bool = True,     # True: self-attention (nối thêm). False: cross (dùng lại)
     ) -> tuple[torch.Tensor, torch.Tensor]:
+        """KV CACHE (TASK 19).
+
+        Không có cache thì mỗi bước sinh phải tính lại key/value cho TOÀN BỘ tiền
+        tố, nên sinh câu dài n token tốn O(n^2) lượt chiếu. Cache giữ lại k, v đã
+        tính nên mỗi bước chỉ còn tính cho đúng token mới: O(n).
+
+        Hai kiểu cache khác hẳn nhau, gộp làm một là sai:
+          - self-attention (noi_cache=True): tiền tố DÀI THÊM mỗi bước, nên k, v
+            của token mới phải NỐI vào phần đã có.
+          - cross-attention (noi_cache=False): key và value lấy từ bộ nhớ encoder,
+            mà bộ nhớ đó cố định suốt quá trình sinh. Tính đúng một lần rồi dùng
+            lại; nối thêm ở đây sẽ nhân đôi câu nguồn sau mỗi bước.
+        """
         q = self._tach_head(self.w_q(query))   # (batch, so_head, len_q, d_head)
-        k = self._tach_head(self.w_k(key))     # (batch, so_head, len_k, d_head)
-        v = self._tach_head(self.w_v(value))   # (batch, so_head, len_k, d_head)
 
         # RoPE chỉ áp cho self-attention (query, key), KHÔNG BAO GIỜ cho value.
         if rope is not None:
             q = rope(q, vi_tri_bat_dau)
-            k = rope(k, vi_tri_bat_dau)
+
+        if cache is not None and not noi_cache and "k" in cache:
+            # Cross-attention đã tính rồi: bộ nhớ encoder không hề đổi.
+            k, v = cache["k"], cache["v"]
+        else:
+            k = self._tach_head(self.w_k(key))     # (batch, so_head, len_k, d_head)
+            v = self._tach_head(self.w_v(value))
+            if rope is not None:
+                k = rope(k, vi_tri_bat_dau)
+            if cache is not None:
+                if noi_cache and "k" in cache:
+                    k = torch.cat([cache["k"], k], dim=2)
+                    v = torch.cat([cache["v"], v], dim=2)
+                cache["k"], cache["v"] = k, v
 
         dau_ra, trong_so_attention = attention_tich_vo_huong(q, k, v, mask, self.dropout)
         dau_ra = self.w_o(self._gop_head(dau_ra))
