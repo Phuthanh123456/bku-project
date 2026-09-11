@@ -34,7 +34,8 @@ class WarmupScheduler:
     quên đọc cấu hình — đỉnh của đường lr nằm ở d_model^(-0.5) * warmup^(-0.5).
     """
 
-    def __init__(self, optimizer, d_model: int, so_buoc_warmup: int = 4000) -> None:
+    def __init__(self, optimizer, d_model: int, so_buoc_warmup: int = 4000,
+                 lr_dinh: float | None = None) -> None:
         if d_model <= 0:
             raise ValueError(f"d_model phải dương, nhận được {d_model}")
         if so_buoc_warmup <= 0:
@@ -42,10 +43,34 @@ class WarmupScheduler:
                 f"so_buoc_warmup phải dương, nhận được {so_buoc_warmup}. "
                 "Muốn tắt warmup thì đặt toi_uu.scheduler = co_dinh."
             )
+        if lr_dinh is not None and lr_dinh <= 0:
+            raise ValueError(f"lr_dinh phải dương, nhận được {lr_dinh}")
 
         self.optimizer = optimizer
         self.d_model = d_model
         self.so_buoc_warmup = so_buoc_warmup
+        self.lr_dinh = lr_dinh
+
+        # HỆ SỐ NHÂN CỦA ĐƯỜNG LR — chỗ này là cái bẫy đã làm hỏng A0 hai lần.
+        #
+        # Công thức Noam BUỘC CHẶT warmup với learning rate đỉnh:
+        #     lr_đỉnh = d_model^(-0.5) * warmup^(-0.5)
+        # Nên đổi warmup là đổi luôn đỉnh, dù người đổi chỉ định thay độ dài dốc:
+        #     warmup 4000 -> đỉnh 6,99e-4   (đúng bằng 7e-4 của đối chứng)
+        #     warmup  120 -> đỉnh 4,03e-3   (GẤP 5,8 LẦN)
+        #
+        # Lượt A0 ngày 10/09 hạ warmup từ 4000 xuống 120 cho vừa ngân sách 3.000
+        # bước, vô tình đẩy đỉnh lên gần 6 lần. Post-Norm cộng fp16 vỡ trong 120
+        # bước đầu rồi kẹt ở nghiệm suy biến: loss_train đứng yên 6,9 suốt 3.000
+        # bước, BLEU 0,00 ở CẢ HAI seed, chrF giống nhau tới sáu chữ số thập phân.
+        # Không NaN, không báo lỗi — chỉ là một mô hình không học gì.
+        #
+        # Đặt lr_dinh thì đỉnh được ghim đúng giá trị đó, còn warmup chỉ còn quyết
+        # định ĐỘ DÀI dốc. Nhờ vậy A0 giữ nguyên hình dạng lịch 2017 (lên dốc rồi
+        # giảm theo nghịch căn) mà vẫn so được với đối chứng, vì cùng một đỉnh.
+        # Để None là giữ nguyên Noam gốc từng chữ.
+        self._he_so = (d_model ** -0.5 if lr_dinh is None
+                       else lr_dinh * (so_buoc_warmup ** 0.5))
 
         # Đặt luôn learning rate của bước 1, để lần cập nhật đầu tiên đã dùng
         # đúng giá trị chứ không dùng lr mặc định còn sót của optimizer.
@@ -54,10 +79,18 @@ class WarmupScheduler:
 
     def _tinh_lr(self, buoc: int) -> float:
         buoc = max(buoc, 1)
-        return (self.d_model ** -0.5) * min(
+        return self._he_so * min(
             buoc ** -0.5,
             buoc * (self.so_buoc_warmup ** -1.5),
         )
+
+    def lr_dinh_thuc_te(self) -> float:
+        """Learning rate cao nhất đường này sẽ đạt tới, tại đúng bước warmup.
+
+        Có hàm này để chỗ khác kiểm được trước khi đốt GPU, thay vì phải tự
+        nhớ lại công thức Noam rồi tính tay — mà tính tay chính là chỗ đã sai.
+        """
+        return self._tinh_lr(self.so_buoc_warmup)
 
     def _ap_dung(self) -> None:
         lr = self._tinh_lr(self._buoc)
@@ -120,7 +153,12 @@ def tao_scheduler(cfg, optimizer):
     """Factory đọc `toi_uu.scheduler` từ YAML."""
     kieu = cfg.toi_uu.scheduler
     if kieu == "warmup":
-        return WarmupScheduler(optimizer, cfg.mo_hinh.d_model, cfg.toi_uu.so_buoc_warmup)
+        # getattr chứ không phải truy cập thẳng: lr_dinh là khóa MỚI, mọi file
+        # cấu hình cũ và mọi checkpoint đã lưu đều không có nó. Truy cập thẳng
+        # là làm hỏng đúng những lượt chạy cũ mà khóa này sinh ra để bảo vệ.
+        return WarmupScheduler(optimizer, cfg.mo_hinh.d_model,
+                               cfg.toi_uu.so_buoc_warmup,
+                               getattr(cfg.toi_uu, "lr_dinh", None))
     if kieu == "co_dinh":
         return SchedulerCoDinh(optimizer, cfg.toi_uu.learning_rate)
     raise ValueError(f"toi_uu.scheduler khong hop le: {kieu} (phai la warmup hoac co_dinh)")

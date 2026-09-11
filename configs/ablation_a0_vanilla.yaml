@@ -70,7 +70,25 @@ toi_uu:
   # (vẫn warmup, vẫn label smoothing), chỉ là warmup được quy đổi cho vừa ngân
   # sách — và phải ghi rõ chuyện quy đổi này trong báo cáo.
   #
-  # scripts/chay_ablation.py có cửa chặn từ chối chạy khi warmup >= ngân sách
-  # bước, nên lỗi này không thể lặp lại mà không ai hay.
   so_buoc_warmup: 120
+  #
+  # GHIM ĐỈNH BẰNG ĐỐI CHỨNG. Thiếu dòng này là hỏng lần thứ hai.
+  #
+  # Riêng warmup 120 KHÔNG đủ. Lịch Noam buộc chặt warmup với learning rate đỉnh:
+  #     lr_đỉnh = d_model^(-0.5) * warmup^(-0.5)
+  # nên hạ warmup 4000 xuống 120 đã vô tình đẩy đỉnh từ 6,99e-4 lên 4,03e-3, tức
+  # GẤP 5,8 LẦN. Lượt 11/09 chạy đủ 3.000 bước trong 67 phút mà Post-Norm cộng
+  # fp16 vỡ ngay trong 120 bước đầu: loss_train đứng yên 6,9 suốt cả lượt, BLEU
+  # 0,00 ở CẢ HAI seed, chrF giống nhau tới sáu chữ số thập phân (dấu hiệu mô
+  # hình sinh ra cùng một thứ suy biến). Không NaN, không báo lỗi.
+  #
+  # lr_dinh ghim đỉnh đúng 7e-4 — BẰNG learning rate của đối chứng — còn warmup
+  # chỉ quyết định ĐỘ DÀI dốc. Nhờ vậy A0 vẫn giữ hình dạng lịch 2017 (lên dốc
+  # rồi giảm theo nghịch căn) mà chênh lệch đo được quy về KIẾN TRÚC, chứ không
+  # phải quy về chuyện hai bên chạy ở learning rate khác nhau.
+  #
+  # PHẢI GHI RÕ TRONG BÁO CÁO: ở ngân sách 3.000 bước thì không thể tái hiện
+  # nguyên si lịch 2017, vì riêng warmup của nó đã dài hơn cả ngân sách. Đây là
+  # một quyết định điều chỉnh có chủ đích, không phải chép y bài báo.
+  lr_dinh: 7.0e-4
   label_smoothing: 0.1

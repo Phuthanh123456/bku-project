@@ -259,16 +259,38 @@ def main() -> None:
             continue
         w = c.toi_uu.so_buoc_warmup
         if w >= so_buoc:
-            xau.append(f"  {ma} ({duong_cfg}): warmup {w:,} >= ngân sách {so_buoc:,}")
+            xau.append(f"  {ma} ({duong_cfg}): warmup {w:,} >= ngân sách "
+                       f"{so_buoc:,} — lr không bao giờ lên tới đỉnh")
+            continue
+
+        # CANH CẢ LEARNING RATE ĐỈNH, KHÔNG CHỈ CANH ĐỘ DÀI WARMUP.
+        #
+        # Bản cửa chặn đầu chỉ hỏi "warmup có ngắn hơn ngân sách không". Nó cho
+        # warmup 120 đi qua — và đó đúng là lượt A0 hỏng lần thứ hai. Vì lịch
+        # Noam buộc chặt hai thứ: lr_đỉnh = d_model^(-0.5) * warmup^(-0.5), nên
+        # rút ngắn warmup là ĐẨY ĐỈNH LÊN. Từ 4000 xuống 120 đẩy đỉnh từ 6,99e-4
+        # lên 4,03e-3, gấp 5,8 lần, và Post-Norm vỡ ngay.
+        #
+        # Cửa chặn canh đúng một nửa còn nguy hơn không canh: nó cấp giấy thông
+        # hành cho nửa còn lại.
+        lr_dinh = getattr(c.toi_uu, "lr_dinh", None)
+        dinh = (lr_dinh if lr_dinh is not None
+                else (c.mo_hinh.d_model ** -0.5) * (w ** -0.5))
+        lr_moc = c.toi_uu.learning_rate
+        if not (lr_moc / 2 <= dinh <= lr_moc * 2):
+            xau.append(
+                f"  {ma} ({duong_cfg}): lr đỉnh {dinh:.3e} lệch quá xa mốc "
+                f"{lr_moc:.3e} (warmup {w:,})")
     if xau:
         raise SystemExit(
-            "\nDỪNG — warmup dài hơn ngân sách bước, lượt chạy sẽ vô nghĩa:\n"
+            "\nDỪNG — lịch learning rate sẽ làm lượt chạy vô nghĩa:\n"
             + "\n".join(xau)
-            + "\n\nLearning rate sẽ không bao giờ lên tới đỉnh, nên điểm đo được\n"
-              "phản ánh chuyện thiếu warmup chứ không phản ánh thứ đang so sánh.\n"
-              "Bài báo 2017 dùng warmup 4.000 cho lượt 100.000 bước, tức 4%.\n"
-              f"Giữ đúng tỉ lệ đó ở ngân sách {so_buoc:,} bước thì warmup nên là "
-              f"{max(1, round(so_buoc * 0.04)):,}.\n")
+            + "\n\nĐiểm đo được sẽ phản ánh chuyện learning rate lệch, chứ không\n"
+              "phản ánh thứ đang muốn so sánh.\n\n"
+              "Lịch Noam buộc chặt warmup với đỉnh:  lr_đỉnh = d_model^-0.5 * "
+              "warmup^-0.5\n"
+              "nên rút ngắn warmup là tự động đẩy đỉnh lên. Muốn dốc ngắn mà\n"
+              "đỉnh vẫn bằng đối chứng thì đặt toi_uu.lr_dinh trong file cấu hình.\n")
 
     ten_nhom = {"chinh": "NHÓM CHÍNH (đối chứng · A0 vanilla · A1 LayerNorm)",
                 "phu": "NHÓM PHỤ (A4 · A5 · A6 · A2 · A3)",

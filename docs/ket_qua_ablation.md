@@ -94,7 +94,48 @@ train 0,998 so với loss dev 2,387, và cơ chế dừng sớm đã kích hoạ
 câu thì 3.000 bước không hề thiếu — đây là bằng chứng cho phần chống quá khớp,
 không phải chuyện may.
 
-## Vì sao A0 phải chạy lại
+## A0 đã hỏng hai lần, cùng một gốc rễ
+
+Cả hai lần đều do **lịch learning rate**, không phải do kiến trúc 2017 kém.
+
+| Lượt | warmup | lr đỉnh | Chuyện xảy ra |
+|---|---|---|---|
+| 10/09 | 4.000 | 6,99e-4 | warmup dài hơn cả ngân sách 3.000 bước — lr **chưa bao giờ lên tới đỉnh**, trung bình cả lượt chỉ ~37% đỉnh. loss_dev 4,77 · BLEU 3,6 |
+| 11/09 | 120 | **4,03e-3** | hạ warmup cho vừa ngân sách, vô tình **đẩy đỉnh lên 5,8 lần**. Post-Norm + fp16 vỡ trong 120 bước đầu. loss_train đứng yên 6,9 suốt 3.000 bước · BLEU **0,00** |
+
+Gốc rễ: lịch Noam của bài báo 2017 **buộc chặt** hai thứ tưởng như độc lập:
+
+$$\text{lr}_{\text{đỉnh}} = d_{\text{model}}^{-0.5} \cdot \text{warmup}^{-0.5}$$
+
+Nên **đổi warmup là đổi luôn learning rate đỉnh**. Con số 4.000 của bài báo cho
+ra đỉnh 6,99e-4 — đúng bằng `7e-4` mà đối chứng dùng, và đó không phải trùng hợp.
+Rút warmup xuống 120 đẩy đỉnh lên 4,03e-3.
+
+Dấu hiệu nhận ra lượt 11/09 là hỏng chứ không phải số đo:
+
+- BLEU **đúng bằng 0,00 ở cả hai seed**, chrF **giống nhau tới sáu chữ số**
+  (`0.287189`). Hai seed khác nhau mà ra y hệt nghĩa là mô hình sinh cùng một
+  thứ suy biến.
+- loss_dev **8,76**, trong khi đoán ngẫu nhiên đều trên 32k từ vựng là
+  `ln(32000) ≈ 10,4`. Chạy 3.000 bước mà gần như không học được gì.
+
+### Cách sửa
+
+Thêm khóa `toi_uu.lr_dinh` để **tách đỉnh khỏi độ dài dốc**. Đặt `lr_dinh: 7.0e-4`
+thì A0 giữ nguyên hình dạng lịch 2017 (lên dốc rồi giảm theo nghịch căn) mà đỉnh
+bằng đối chứng — nhờ vậy chênh lệch đo được quy về **kiến trúc**, không quy về
+chuyện hai bên chạy ở learning rate khác nhau.
+
+Cửa chặn trong `chay_ablation.py` giờ canh **cả lr đỉnh**, không chỉ canh độ dài
+warmup. Bản đầu chỉ hỏi "warmup có ngắn hơn ngân sách không" nên nó cho warmup
+120 đi qua — đúng lượt hỏng lần hai. Cửa chặn canh đúng một nửa còn nguy hơn
+không canh, vì nó cấp giấy thông hành cho nửa còn lại.
+
+**Phải ghi trong báo cáo**: ở ngân sách 3.000 bước thì không thể tái hiện nguyên
+si lịch 2017, vì riêng warmup của nó đã dài hơn cả ngân sách. Việc ghim đỉnh là
+một quyết định điều chỉnh có chủ đích, không phải chép y bài báo.
+
+## Phụ lục — lần hỏng đầu tiên
 
 `configs/ablation_a0_vanilla.yaml` từng đặt `so_buoc_warmup: 4000` y như bài báo
 2017, trong khi ngân sách ablation chỉ có **3.000 bước**.
