@@ -300,6 +300,13 @@ def main() -> None:
                              "ngắn: mặc định 1000 bước mới đánh giá một lần, nên "
                              "smoke 60 bước không đánh giá lần nào, không sinh ra "
                              "tot_nhat.pt, và cả đường chấm BLEU không hề được kiểm.")
+    parser.add_argument("--so-buoc-warmup", type=int, default=None,
+                        help="ghi đè toi_uu.so_buoc_warmup. Dùng để quét thử vài "
+                             "độ dài warmup mà không phải sinh ra một file cấu "
+                             "hình riêng cho mỗi giá trị.")
+    parser.add_argument("--canh-bay-tu-buoc", type=int, default=None,
+                        help="ghi đè huan_luyen.canh_bay_tu_buoc — từ bước này "
+                             "trở đi thì cầu dao bẫy unigram mới có hiệu lực.")
     args = parser.parse_args()
 
     cfg = nap_config(args.config)
@@ -313,6 +320,10 @@ def main() -> None:
         # tìm ra bản tốt nhất rồi mà chưa kịp lưu lần nào.
         cfg["huan_luyen"]["luu_checkpoint_moi"] = min(
             cfg.huan_luyen.luu_checkpoint_moi, args.danh_gia_moi)
+    if args.so_buoc_warmup is not None:
+        cfg["toi_uu"]["so_buoc_warmup"] = args.so_buoc_warmup
+    if args.canh_bay_tu_buoc is not None:
+        cfg["huan_luyen"]["canh_bay_tu_buoc"] = args.canh_bay_tu_buoc
     cfg["thi_nghiem"]["duong_dan_config"] = args.config
     dat_seed(cfg.thi_nghiem.seed, cfg.thi_nghiem.deterministic)
 

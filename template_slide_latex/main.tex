@@ -775,29 +775,33 @@
           \setlength{\itemsep}{0.15em}
           \item Chấm bằng \textbf{sacrebleu}: BLEU và chrF++, phải báo cáo
             \textbf{nguyên văn chuỗi chữ ký} thì mới so sánh được với người khác
-          \item Sinh câu: \textbf{Greedy} làm mốc, \textbf{Beam $= 4$} để so
-          \item \textbf{KV cache} đã đo thật trên 40 câu tst2013: ra \textbf{đúng cùng
-            một chuỗi token} mà nhanh gấp \textbf{5{,}5 lần} ($20{,}3 \rightarrow
-            3{,}7$ giây)
+          \item \textbf{Beam $=4$ hơn Greedy $+0{,}80$ BLEU} trên tst2013 (yêu cầu
+            $\ge 0{,}50$) — đổi lại chậm hơn $1{,}8$ lần
+          \item \textbf{KV cache}: ra \textbf{đúng cùng một chuỗi token} mà nhanh
+            gấp \textbf{5{,}5 lần} ($20{,}3 \rightarrow 3{,}7$ giây) — cache chỉ
+            được phép đổi tốc độ, có bài test đơn vị canh điều đó
           \item Hướng Anh $\rightarrow$ Việt, tập \textbf{tst2013}, \textbf{1.268} câu,
             chỉ dùng \textbf{một lần} ở bước cuối
         \end{itemize}
       \end{block}
-      \begin{block}{Bảng điểm — đối chứng, 3.000 bước, 2 seed}
+      \begin{block}{Bảng điểm — Greedy vs Beam, cùng một checkpoint}
         \scriptsize\bangchat
-        \begin{tabular}{@{}lcc@{}}
+        \begin{tabular}{@{}llccr@{}}
           \toprule
-          \textbf{Tập} & \textbf{BLEU} & \textbf{chrF++} \\
+          \textbf{Tập} & \textbf{Sinh câu} & \textbf{BLEU} & \textbf{chrF++} &
+          \textbf{Giây} \\
           \midrule
-          tst2012 (dev)  & 25{,}41 / 25{,}45 & 44{,}77 / 44{,}73 \\
-          \textbf{tst2013 (test)} & \textbf{28{,}74 / 28{,}37} &
-            \textbf{47{,}62 / 47{,}50} \\
+          tst2012 (dev)  & Greedy    & 25{,}41 & 44{,}77 & 8{,}9 \\
+          tst2012 (dev)  & Beam $=4$ & 26{,}59 & 45{,}75 & 15{,}7 \\
+          \midrule
+          tst2013 (test) & Greedy    & 28{,}74 & 47{,}62 & 9{,}8 \\
+          \textbf{tst2013 (test)} & \textbf{Beam $=4$} & \textbf{29{,}53} &
+            \textbf{48{,}41} & 17{,}2 \\
           \bottomrule
         \end{tabular}
         \par\vspace{0.3em}
-        Hai số là hai seed (42 / 1337). Sinh câu bằng greedy.
-        \textbf{Vượt mốc $\ge 19$ của đề tài}, sát mốc "rất tốt" $\ge 29$ — mà mới
-        chỉ \textbf{3.000 bước}, tức 17\% ngân sách của lượt huấn luyện chính.
+        {\tiny Chữ ký BLEU \texttt{nrefs:1\textbar case:mixed\textbar eff:no%
+        \textbar tok:13a\textbar smooth:exp\textbar version:2.6.0}}
       \end{block}
     \end{column}
     \begin{column}{0.48\textwidth}
@@ -853,9 +857,10 @@
             \textbf{0{,}01\%}.
           \item \textbf{Chốt cấu hình bằng số đo:} 8 cấu hình đã khảo sát trên T4, chọn
             theo bảng chứ không theo bài báo.
-          \item \textbf{Kết quả dịch:} \textbf{28{,}74} BLEU và \textbf{47{,}62}
-            chrF++ trên tst2013 (sacrebleu), chỉ với \textbf{3.000 bước} và
-            \textbf{chỉ dùng dữ liệu trong ràng buộc} — vượt mốc $\ge 19$ của đề tài.
+          \item \textbf{Kết quả dịch:} Greedy \textbf{28{,}74} BLEU, Beam $=4$
+            \textbf{29{,}53} BLEU và \textbf{48{,}41} chrF++ trên tst2013
+            (sacrebleu) — \textbf{vượt mốc "rất tốt" $\ge 29$}, mà chỉ với
+            \textbf{3.000 bước} và \textbf{chỉ dùng dữ liệu trong ràng buộc}.
         \end{itemize}
       \end{block}
     \end{column}
