@@ -23,7 +23,7 @@ ENV PATH=/home/appuser/.local/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     STREAMLIT_BROWSER_GATHER_USAGE_STATS=false \
     HF_HOME=/home/appuser/.cache/huggingface \
-    HF_MODEL_REPO=mgbao/envi-nmt-scratch-transformer \
+    HF_MODEL_REPO=phudeeptry/envi-translate-model \
     PORT=8501
 
 COPY --chown=appuser:appuser src/ ./src/

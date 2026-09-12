@@ -12,9 +12,9 @@ import sys
 from pathlib import Path
 
 
-MODEL_REPO_MAC_DINH = "mgbao/envi-nmt-scratch-transformer"
-CHECKPOINT_TREN_HUB = "checkpoints/abl3000_base_seed42/tot_nhat.pt"
-TOKENIZER_TREN_HUB = "artifacts/tokenizer/tokenizer.json"
+MODEL_REPO_MAC_DINH = "phudeeptry/envi-translate-model"
+CHECKPOINT_TREN_HUB = "inference_state.pt"
+TOKENIZER_TREN_HUB = "tokenizer.json"
 
 
 def _lay_artifact(ten_bien: str, mac_dinh_local: str, ten_file_hub: str) -> str:

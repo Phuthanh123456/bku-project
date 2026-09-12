@@ -7,6 +7,7 @@ import gc
 import html
 import io
 import os
+import pickle
 import sys
 import time
 from dataclasses import dataclass
@@ -57,12 +58,24 @@ class BoDich:
         # Checkpoint huấn luyện còn chứa optimizer/scaler nên lớn hơn riêng model
         # nhiều lần. mmap chỉ đọc các trang thật sự dùng; assign=True gắn trực tiếp
         # tensor model thay vì tạo thêm một bản sao, giữ peak RAM đủ thấp cho cloud.
-        goi = torch.load(
-            checkpoint_path,
-            map_location="cpu",
-            weights_only=False,
-            mmap=True,
-        )
+        try:
+            # Checkpoint inference chỉ có tensor: nạp an toàn và ánh xạ từ đĩa,
+            # không nhân đôi hàng trăm MB trong RAM của dịch vụ cloud.
+            goi = torch.load(
+                checkpoint_path,
+                map_location="cpu",
+                weights_only=True,
+                mmap=True,
+            )
+        except pickle.UnpicklingError:
+            # Tương thích checkpoint huấn luyện cũ ở local. File này do chính
+            # nhóm tạo nên có thể nạp pickle; mmap vẫn tránh đọc optimizer vào RAM.
+            goi = torch.load(
+                checkpoint_path,
+                map_location="cpu",
+                weights_only=False,
+                mmap=True,
+            )
         if not isinstance(goi, dict) or "model" not in goi:
             raise ValueError("Checkpoint không đúng định dạng: thiếu khóa 'model'.")
 
