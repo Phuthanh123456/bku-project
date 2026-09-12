@@ -10,7 +10,7 @@
 
 ## Demo trực tuyến
 
-Mở và dùng thử bản demo Streamlit tại: **[ENVI Translate](https://phuthanh123456-bku-p-deploystreamlit-cloudstreamlit-app-cdahf3.streamlit.app)**.
+Mở và dùng thử bản demo Streamlit tại: **[ENVI Translate](https://envi-translate.streamlit.app)**.
 
 ---
 
