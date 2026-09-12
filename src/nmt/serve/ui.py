@@ -189,6 +189,31 @@ TOKENIZER = _duong_dan("DUONG_DAN_TOKENIZER", "artifacts/tokenizer/tokenizer.jso
 CONFIG = _duong_dan("DUONG_DAN_CONFIG", "configs/abl3000_base_seed42.yaml")
 
 
+def _lay_artifact_cloud(duong_dan_local: str, ten_bien_file: str) -> str:
+    if Path(duong_dan_local).is_file():
+        return duong_dan_local
+
+    repo_id = os.environ.get("HF_MODEL_REPO")
+    ten_file = os.environ.get(ten_bien_file)
+    if not repo_id or not ten_file:
+        return duong_dan_local
+
+    from huggingface_hub import hf_hub_download
+
+    return hf_hub_download(repo_id=repo_id, filename=ten_file)
+
+
+def _nap_bo_dich_an_toan() -> BoDich | None:
+    try:
+        checkpoint = _lay_artifact_cloud(CHECKPOINT, "HF_MODEL_CHECKPOINT")
+        tokenizer = _lay_artifact_cloud(TOKENIZER, "HF_MODEL_TOKENIZER")
+        return nap_bo_dich(checkpoint, tokenizer, CONFIG)
+    except Exception as exc:
+        print(f"Lỗi khởi động: {exc}", file=sys.stderr)
+        st.error("Trình dịch chưa thể khởi động. Vui lòng thử lại sau ít phút.")
+        return None
+
+
 CSS = """
 <style>
 :root {
@@ -287,14 +312,6 @@ def main() -> None:
     )
     st.markdown(CSS, unsafe_allow_html=True)
 
-    with st.spinner("Đang chuẩn bị trình dịch…"):
-        try:
-            bo_dich = nap_bo_dich(CHECKPOINT, TOKENIZER, CONFIG)
-        except Exception as exc:
-            print(f"Lỗi khởi động: {exc}", file=sys.stderr)
-            st.error("Ứng dụng chưa sẵn sàng. Vui lòng kiểm tra lại dữ liệu và khởi động lại.")
-            st.stop()
-
     st.markdown(
         """
         <nav class="topbar">
@@ -345,7 +362,10 @@ def main() -> None:
                 st.warning("Hãy nhập nội dung tiếng Anh trước khi dịch.")
             else:
                 with st.spinner("Đang tạo bản dịch tự nhiên nhất…"):
-                    cac_ket_qua = _dich_an_toan(bo_dich, [cau.strip()])
+                    bo_dich = _nap_bo_dich_an_toan()
+                    cac_ket_qua = (
+                        _dich_an_toan(bo_dich, [cau.strip()]) if bo_dich else None
+                    )
                 if cac_ket_qua:
                     ket_qua = cac_ket_qua[0]
                     st.session_state["ket_qua_cuoi"] = ket_qua
@@ -404,16 +424,18 @@ def main() -> None:
         if st.button("Dịch tệp", type="primary", disabled=not cac_cau):
             tien_do = st.progress(0, text="Đang chuẩn bị…")
             tat_ca: list[ThongTinBanDich] = []
-            thanh_cong = True
-            for bat_dau in range(0, len(cac_cau), 2):
-                batch = cac_cau[bat_dau : bat_dau + 2]
-                ket_qua_batch = _dich_an_toan(bo_dich, batch)
-                if ket_qua_batch is None:
-                    thanh_cong = False
-                    break
-                tat_ca.extend(ket_qua_batch)
-                da_xong = min(bat_dau + len(batch), len(cac_cau))
-                tien_do.progress(da_xong / len(cac_cau), text=f"Đã dịch {da_xong}/{len(cac_cau)} câu")
+            bo_dich = _nap_bo_dich_an_toan()
+            thanh_cong = bo_dich is not None
+            if bo_dich:
+                for bat_dau in range(0, len(cac_cau), 2):
+                    batch = cac_cau[bat_dau : bat_dau + 2]
+                    ket_qua_batch = _dich_an_toan(bo_dich, batch)
+                    if ket_qua_batch is None:
+                        thanh_cong = False
+                        break
+                    tat_ca.extend(ket_qua_batch)
+                    da_xong = min(bat_dau + len(batch), len(cac_cau))
+                    tien_do.progress(da_xong / len(cac_cau), text=f"Đã dịch {da_xong}/{len(cac_cau)} câu")
             tien_do.empty()
             if thanh_cong:
                 st.session_state["ket_qua_tep"] = (cac_cau, tat_ca)
