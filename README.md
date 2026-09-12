@@ -8,6 +8,10 @@
 > hay bất kỳ mô hình pretrained nào **trong `src/`**.
 > Các lớp tham chiếu của PyTorch chỉ được phép xuất hiện trong `tests/`.
 
+## Demo trực tuyến
+
+Mở và dùng thử bản demo Streamlit tại: **[ENVI Translate](https://phuthanh123456-bku-p-deploystreamlit-cloudstreamlit-app-cdahf3.streamlit.app)**.
+
 ---
 
 ## Bảng kết quả
