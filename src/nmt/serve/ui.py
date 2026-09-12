@@ -36,6 +36,7 @@ class BoDich:
 
     def __init__(self, checkpoint: str, tokenizer: str, config: str) -> None:
         from nmt.data import BOS_ID, EOS_ID, PAD_ID, nap_tokenizer
+        from nmt.model.positional import MaHoaViTriSinCos, RoPE
         from nmt.model.transformer import TransformerNMT
         from nmt.utils import nap_config
 
@@ -79,8 +80,31 @@ class BoDich:
         if not isinstance(goi, dict) or "model" not in goi:
             raise ValueError("Checkpoint không đúng định dạng: thiếu khóa 'model'.")
 
-        self.model = TransformerNMT(self.cfg)
+        # Khá»Ÿi táº¡o cáº¥u trÃºc khÃ´ng cáº¥p pháº§n bá»™ nhá»› cho tensor FP32. Náº¿u khá»Ÿi táº¡o
+        # bÃ¬nh thÆ°á»ng rá»“i má»›i náº¡p FP16, cloud pháº£i giá»¯ Ä‘á»“ng thá»i cáº£ hai báº£n
+        # trá»ng sá»‘ vÃ  dá»… bá»‹ kill do vÆ°á»£t RAM ngay lÃºc boot.
+        with torch.device("meta"):
+            self.model = TransformerNMT(self.cfg)
         self.model.load_state_dict(goi["model"], strict=True, assign=True)
+
+        # CÃ¡c báº£ng vá»‹ trÃ­ lÃ  non-persistent buffer nÃªn khÃ´ng cÃ³ trong state_dict.
+        # Táº¡o láº¡i riÃªng chÃºng (ráº¥t nhá») sau khi Ä‘Ã£ gáº¯n trá»ng sá»‘ tá»« checkpoint.
+        for module in self.model.modules():
+            if isinstance(module, RoPE):
+                bo_dem = RoPE(
+                    module.d_head,
+                    theta=float(self.cfg.mo_hinh.rope_theta),
+                    do_dai_toi_da=module.do_dai_toi_da,
+                )
+                module.inv_freq = bo_dem.inv_freq
+                module.cos_cache = bo_dem.cos_cache
+                module.sin_cache = bo_dem.sin_cache
+            elif isinstance(module, MaHoaViTriSinCos):
+                bo_dem = MaHoaViTriSinCos(
+                    d_model=int(self.cfg.mo_hinh.d_model),
+                    do_dai_toi_da=int(self.cfg.du_lieu.do_dai_toi_da),
+                )
+                module.pe = bo_dem.pe
         self.model.to(self.thiet_bi)
         self.model.eval()
         del goi
