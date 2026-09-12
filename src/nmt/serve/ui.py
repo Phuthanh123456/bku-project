@@ -54,12 +54,21 @@ class BoDich:
         self.tokenizer = nap_tokenizer(tokenizer_path)
         self.pad_id, self.bos_id, self.eos_id = PAD_ID, BOS_ID, EOS_ID
 
-        goi = torch.load(checkpoint_path, map_location=self.thiet_bi, weights_only=False)
+        # Checkpoint huấn luyện còn chứa optimizer/scaler nên lớn hơn riêng model
+        # nhiều lần. mmap chỉ đọc các trang thật sự dùng; assign=True gắn trực tiếp
+        # tensor model thay vì tạo thêm một bản sao, giữ peak RAM đủ thấp cho cloud.
+        goi = torch.load(
+            checkpoint_path,
+            map_location="cpu",
+            weights_only=False,
+            mmap=True,
+        )
         if not isinstance(goi, dict) or "model" not in goi:
             raise ValueError("Checkpoint không đúng định dạng: thiếu khóa 'model'.")
 
-        self.model = TransformerNMT(self.cfg).to(self.thiet_bi)
-        self.model.load_state_dict(goi["model"], strict=True)
+        self.model = TransformerNMT(self.cfg)
+        self.model.load_state_dict(goi["model"], strict=True, assign=True)
+        self.model.to(self.thiet_bi)
         self.model.eval()
         del goi
         gc.collect()
