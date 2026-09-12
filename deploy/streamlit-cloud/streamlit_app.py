@@ -15,7 +15,7 @@ sys.path.insert(0, str(GOC / "src"))
 MODEL_REPO = "phudeeptry/envi-translate-model"
 os.environ["DUONG_DAN_CHECKPOINT"] = hf_hub_download(
     repo_id=MODEL_REPO,
-    filename="inference_state.pt",
+    filename="inference_fp16.pt",
 )
 os.environ["DUONG_DAN_TOKENIZER"] = hf_hub_download(
     repo_id=MODEL_REPO,

@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 MODEL_REPO_MAC_DINH = "phudeeptry/envi-translate-model"
-CHECKPOINT_TREN_HUB = "inference_state.pt"
+CHECKPOINT_TREN_HUB = "inference_fp16.pt"
 TOKENIZER_TREN_HUB = "tokenizer.json"
 
 

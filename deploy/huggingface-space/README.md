@@ -11,7 +11,7 @@ short_description: Dịch máy Anh–Việt bằng Transformer do nhóm tự xâ
 models:
   - phudeeptry/envi-translate-model
 preload_from_hub:
-  - phudeeptry/envi-translate-model inference_state.pt,tokenizer.json
+  - phudeeptry/envi-translate-model inference_fp16.pt,tokenizer.json
 startup_duration_timeout: 30m
 ---
 
